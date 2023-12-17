@@ -827,7 +827,8 @@ const char *modifier;
 # define STDERR_FILE                TEXT("stderr.txt")
 # define DEFAULT_CONFIG_FILE            "/dosbox-x.conf"
 #elif defined(MACOSX)
-# define DEFAULT_CONFIG_FILE            "/Library/Preferences/DOSBox Preferences"
+// emendelson
+# define DEFAULT_CONFIG_FILE            "../Resources/dosbox-x.conf"
 #elif defined(HAIKU)
 #define DEFAULT_CONFIG_FILE             "~/config/settings/dosbox-x/dosbox-x.conf"
 #else /*linux freebsd*/
