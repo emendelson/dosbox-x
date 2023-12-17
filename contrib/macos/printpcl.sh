@@ -9,7 +9,7 @@ fi
 
 cd "$(dirname "$0")"
 
-./pcl6 -dNOPAUSE -sDEVICE=pdfwrite -sOutputFile=temp.pdf "$1"
+./gpcl6 -dNOPAUSE -sDEVICE=pdfwrite -sOutputFile=temp.pdf "$1"
 
 /usr/bin/lpr -r temp.pdf
 rm "$1"
