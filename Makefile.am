@@ -13,8 +13,6 @@ endif
 
 .PHONY: dosbox-x.app
 
-# emendelson adds copy dosbox-x.conf to Resources folder
-# adds gs and gpcl6 
 dosbox-x.app: $(MACOS_BINARIES) contrib/macos/dosbox.icns src/tool/mach-o-matic
 	rm -Rfv dosbox-x.app
 	mkdir dosbox-x.app
@@ -29,8 +27,11 @@ dosbox-x.app: $(MACOS_BINARIES) contrib/macos/dosbox.icns src/tool/mach-o-matic
 	cp -v contrib/macos/dosbox-x.plist dosbox-x.app/Contents/Info.plist
 	cp -v contrib/macos/dosbox-x.pkginfo dosbox-x.app/Contents/PkgInfo
 	cp -v contrib/macos/dosbox.icns dosbox-x.app/Contents/Resources/dosbox-x.icns
-	cp -v contrib/macos/gs dosbox-x.app/Contents/Resources/gs
-	cp -v contrib/macos/gpcl6 dosbox-x.app/Contents/Resources/gpcl6
+	cp -v contrib/macos/gs dosbox-x.app/Contents/Resources/gs  #emendelson
+	cp -v contrib/macos/gpcl6 dosbox-x.app/Contents/Resources/gpcl6   #emendelson
+	cp -v contrib/macos/nenscript dosbox-x.app/Contents/Resources/nenscript  #emendelson
+	cp -v contrib/macos/dosbox-x-macos.conf dosbox-x.app/Contents/Resources/dosbox-x.conf   #emendelson
+	cp -v contrib/macos/*.sh dosbox-x.app/Contents/Resources/  #emendelson
 	cp -v contrib/fonts/FREECG98.BMP dosbox-x.app/Contents/Resources/freecg98.bmp
 	cp -v contrib/fonts/wqy_1?pt.bdf dosbox-x.app/Contents/Resources/
 	cp -v contrib/fonts/Nouveau_IBM.ttf dosbox-x.app/Contents/Resources/Nouveau_IBM.ttf
@@ -39,7 +40,6 @@ dosbox-x.app: $(MACOS_BINARIES) contrib/macos/dosbox.icns src/tool/mach-o-matic
 	cp -v contrib/glshaders/* dosbox-x.app/Contents/Resources/glshaders/
 	cp -v contrib/translations/*/*.lng dosbox-x.app/Contents/Resources/languages/
 	cp -v dosbox-x.reference.conf dosbox-x.app/Contents/Resources/
-	cp -v dosbox-x.reference.conf dosbox-x.app/Contents/Resources/dosbox-x.conf
 	cp -v dosbox-x.reference.full.conf dosbox-x.app/Contents/Resources/
 	if [ -f src/dosbox-x-arm64 ]; then cp -v src/dosbox-x-arm64 dosbox-x.app/Contents/MacOS/arm64/dosbox-x; fi
 	if [ -f src/dosbox-x-x86_64 ]; then cp -v src/dosbox-x-x86_64 dosbox-x.app/Contents/MacOS/x86_64/dosbox-x; fi
