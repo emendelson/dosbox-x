@@ -6,7 +6,7 @@ NOW=$(date '+%F_%H:%M:%S')
 
 # osascript -e ' tell application "System Events" to display dialog "path is:'"$FULLPATH"' " buttons {"OK"}'
 
-./gs -sBATCH -dNOPAUSE -sDEVICE=pdfwrite -sOutputFile="temporary-$NOW.pdf" "$1" 
+./gs -dBATCH -dNOPAUSE -sDEVICE=pdfwrite -sOutputFile="temporary-$NOW.pdf" "$1" 
 
 sleep 1
 
