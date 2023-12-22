@@ -30,7 +30,7 @@ dosbox-x.app: $(MACOS_BINARIES) contrib/macos/dosbox.icns src/tool/mach-o-matic
 	cp -v contrib/macos/gs dosbox-x.app/Contents/Resources/gs  #emendelson
 	cp -v contrib/macos/gpcl6 dosbox-x.app/Contents/Resources/gpcl6   #emendelson
 	cp -v contrib/macos/nenscript dosbox-x.app/Contents/Resources/nenscript  #emendelson
-	cp -v contrib/macos/dosbox-x-macos.conf dosbox-x.app/Contents/Resources/dosbox-x.conf   #emendelson
+	cp -v contrib/macos/dosbox-x.conf dosbox-x.app/Contents/Resources/dosbox-x.conf   #emendelson
 	cp -v contrib/macos/*.sh dosbox-x.app/Contents/Resources/  #emendelson
 	cp -v contrib/fonts/FREECG98.BMP dosbox-x.app/Contents/Resources/freecg98.bmp
 	cp -v contrib/fonts/wqy_1?pt.bdf dosbox-x.app/Contents/Resources/
