@@ -36,21 +36,19 @@ osascript - "$PDF" <<EndOfScript
 	set queueList to (every paragraph of queueNames) as list
 	
 	if the (count of printerList) is 1 then
+	
 		set thePrinter to {item 1 of printerList} as string
 		set theQueue to {item 1 of queueList} as string
 		
 	else
+	
 		tell application "SystemUIServer"
 			activate
 			try
 				set thePrinter to (choose from list printerList with title "Printers" with prompt "Select a printer:")
 			end try
 		end tell
-		tell application "System Events"
-			try
-				set frontmost of process myProc to true
-			end try
-		end tell
+		
 		if thePrinter is false then
 			tell application "System Events"
 				activate
@@ -67,22 +65,21 @@ osascript - "$PDF" <<EndOfScript
 			end repeat
 		
 			set theQueue to item item_num in queueList
-			try
-				do shell script "lpr -r -P " & "\"" & theQueue & "\"" & " " & pdfPosix
-			on error err
-				tell application "System Events"
-					activate
-					display dialog err
-					display dialog "Could not send PDF file to printer." buttons {"OK"} with title msgTitle giving up after 10
-					try
-						set frontmost of process myProc to true
-					end try
-				end tell
-			end try
-			try
-				do shell script "rm " & pdfPosix
-			end try
 		end if
+		
+		try
+			do shell script "lpr -r -P " & "\"" & theQueue & "\"" & " " & pdfPosix
+		on error err
+			tell application "System Events"
+				activate
+				display dialog err
+				display dialog "Could not send PDF file to printer." buttons {"OK"} with title msgTitle giving up after 10
+			end tell
+		end try
+		try
+			do shell script "rm " & pdfPosix
+		end try
+			
 	end if
 	end run
 	
