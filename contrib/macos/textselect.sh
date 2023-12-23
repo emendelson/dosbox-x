@@ -6,7 +6,7 @@ cd "$(dirname "$0")"
 PTRS=$( lpstat -p | grep -c "enabled")
 if [ ! "$PTRS" -gt 0 ]; then
 	message="No printers available."
-	osascript -e "tell app \"System Events\" to display dialog \"$message\" buttons {\"OK\"} with title {\"DOSBox-X Printing\"}"
+	osascript -e "tell app \"System Events\" to display dialog \"$message\" buttons {\"OK\"} with title \"DOSBox-X Printing\""
 	exit
 fi
 
@@ -57,11 +57,13 @@ osascript - "$PDF" <<EndOfScript
 		end tell
 		
 		if thePrinter is false then
+
 			tell application "System Events"
 				activate
 				display dialog "Printing cancelled." buttons {"OK"} default button 1 with title msgTitle giving up after 3
 			end tell
 			do shell script "rm " & pdfPosix
+
 		else
 			set thePrinter to item 1 of thePrinter
 			
@@ -72,23 +74,44 @@ osascript - "$PDF" <<EndOfScript
 			end repeat
 		
 			set theQueue to item item_num in queueList
-		end if
-		
-		try
-			do shell script "lpr -r -P " & "\"" & theQueue & "\"" & " " & pdfPosix
-		on error err
-			tell application "System Events"
-				activate
-				display dialog err
-				display dialog "Could not send PDF file to printer." buttons {"OK"} with title msgTitle giving up after 10
-			end tell
-		end try
-		try
-			do shell script "rm " & pdfPosix
-		end try
 			
+			try
+				do shell script "lpr -r -P " & "\"" & theQueue & "\"" & " " & pdfPosix
+			on error err
+				tell application "System Events"
+					activate
+					display dialog err
+					display dialog "Could not send PDF file to printer." buttons {"OK"} with title msgTitle giving up after 10
+				end tell
+			end try
+			try
+				do shell script "rm " & pdfPosix
+			end try
+		
+			delay 1
+			set prtDone to false
+			repeat with i from 1 to 10
+				try
+					set ptrState to do shell script "lpq -P " & "\"" & theQueue & "\""
+					if ptrState contains "entries" then
+						set prtDone to true
+						exit repeat
+					else 
+						delay 1
+					end if
+				end try
+			end repeat
+			
+			if prtDone is false then 
+				tell application "System Events"
+					activate
+					display dialog thePrinter & return & "may be offline. If so, please cancel the print job and choose a different printer." buttons {"OK"} with title msgTitle 
+				end tell
+			end if
+		
+		end if
 	end if
-	end run
+end run
 	
 EndOfScript
 
