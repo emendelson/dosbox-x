@@ -71,7 +71,7 @@ osascript - "$PDF" <<EndOfScript
 		
 			delay 1
 			set prtDone to false
-			repeat with i from 1 to 10
+			repeat with i from 1 to 20
 				try
 					set ptrState to do shell script "lpq -P " & "\"" & theQueue & "\""
 					if ptrState contains "entries" then
@@ -86,7 +86,7 @@ osascript - "$PDF" <<EndOfScript
 			if prtDone is false then 
 				tell application "System Events"
 					activate
-					display dialog thePrinter & return & "may be offline. If so, please cancel the print job and choose a different printer." buttons {"OK"} with title msgTitle 
+					display dialog "If nothing printed, the selected printer" & return & return & "      " & thePrinter & return & return & "may be offline. If so, please cancel the print job and select a different printer." buttons {"OK"} with title msgTitle 
 				end tell
 			end if
 		
