@@ -1,43 +1,46 @@
 #!/bin/bash
 
-# convert text file to pdf and print
+cd "$(dirname "$0")"
 
-# Get the default printer's name
-default_printer=$(lpstat -d 2>&1)
-# Check if a default printer is set
-if [[ $default_printer == *"no system default destination"* ]]; then
-    message="No default printer set. I cannot print the printer output."
-    # Use osascript to display the message in a dialog box
-	osascript -e "tell app \"System Events\" to display dialog \"$message\" buttons {\"OK\"} with title {\"DOSBox-X Printing\"}"
+# test for available printers
+PTRS=$( lpstat -p | grep -c "enabled")
+if [ ! "$PTRS" -gt 0 ]; then
+	message="No printers available."
+	osascript -e "tell app \"System Events\" to display dialog \"$message\" buttons {\"OK\"} with title \"DOSBox-X Printing\""
 	exit
 fi
 
-cd "$(dirname "$0")"
-
 LOC=$( defaults read "Apple Global Domain" AppleLocale )
 PAPER="a4"
-if [ $LOC = "en_US" ] || [ $LOC = "en_CA" ] ; then
+if [ "$LOC" = "en_US" ] || [ "$LOC" = "en_CA" ] ; then
    PAPER="us"
 fi
 
 ./nenscript -p temp.ps -fCourier9 -B -T $PAPER "$1"
 ./gs -sBATCH -dNOPAUSE -sDEVICE=pdfwrite -sOutputFile=temp.pdf temp.ps
 
-/usr/bin/lpr -r temp.pdf
+lpr -r temp.pdf
 rm temp.ps
 rm "$1"
 
-sleep 2
+sleep 1
 
-empty="no entries"
+# queue=$(lpq | grep "entries")
 
-SECONDS=0
-until queue=$(lpq | grep "$empty")
-do 
-  if (( SECONDS > 10 ))
-  then
+for ((n=0;n<30;n++)); do
+   if lpq | grep -q 'entries'; then 
+   		#  osascript -e "tell app \"System Events\" to display dialog \"OK\" buttons {\"OK\"} with title {\"DOSBox-X Printing\"}"
+	 	exit 0
+	else
+		sleep 1
+	fi
+done
+
+if lpq | grep -q 'entries'; then 
+	exit 0
+else
   
-  description=$(awk '
+     		 description=$(awk '
 /system default destination:/    { defprt = $NF; next }       # make note of default printer name
 $2==defprt && $1=="printer"      { print_desc = 1; next }     # if this is the line for the default printer then set flag (print_desc) to "1"
 print_desc && $1=="Description:" { pos = index($0,": ")       # if print flag is set (==1) and this is a description line then find the ": " and ...
@@ -47,17 +50,15 @@ print_desc && $1=="Description:" { pos = index($0,": ")       # if print flag is
 
 ' <(lpstat -dlp))
 	
-     message="If nothing printed, the default printer
+message="If nothing printed, the default printer
      
-      $description 
+      		$description 
 
 may be offline. If so, cancel the print job and set another printer as the default."
 
    osascript -e "tell app \"System Events\" to display dialog \"$message\" buttons {\"OK\"} with title {\"DOSBox-X Printing\"}"
-	exit
-	
-  fi
-done
+fi
 
-exit
+exit 0
+
 
