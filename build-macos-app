@@ -160,6 +160,8 @@ for arch in ${architectures}; do
     cp src/dosbox-x "src/dosbox-x-${arch}"
 done
 
+rm dosbox-x.app
+rm dosbox-x-SDL1.app
 make dosbox-x.app
 mv -f dosbox-x.app dosbox-x-SDL1.app
-open dosbox-x-SDL1.app
+open ./dosbox-x-SDL1.app
