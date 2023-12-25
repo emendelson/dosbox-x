@@ -1,5 +1,8 @@
 #!/usr/bin/env bash
 
+cd "$(dirname "$0")"
+make distclean || true
+
 # I'm sick and tired of all the churn the three versions of autoconf
 # are causing in this repo. Stop committing the configure scripts
 # and just autoregen.
