@@ -57,25 +57,25 @@ osascript - "$PDF" <<EndOfScript
 			set theQueue to item item_num in queueList
 			
 			try
-				do shell script "lpr -r -P " & "\"" & theQueue & "\"" & " " & pdfPosix
+				do shell script "lpr -P " & "\"" & theQueue & "\"" & " " & pdfPosix
 			on error err
+				do shell script "rm " & pdfPosix
 				tell application "System Events"
 					activate
 					display dialog err
 					display dialog "Could not send PDF file to printer." buttons {"OK"} with title msgTitle giving up after 10
 				end tell
 			end try
-			try
-				do shell script "rm " & pdfPosix
-			end try
+			
 		
 			delay 1
 			set prtDone to false
-			repeat with i from 1 to 20
+			repeat with i from 1 to 5 --CHANGE BACK TO 20
 				try
 					set ptrState to do shell script "lpq -P " & "\"" & theQueue & "\""
 					if ptrState contains "entries" then
 						set prtDone to true
+						do shell script "rm " & pdfPosix
 						exit repeat
 					else 
 						delay 1
@@ -86,7 +86,16 @@ osascript - "$PDF" <<EndOfScript
 			if prtDone is false then 
 				tell application "System Events"
 					activate
-					display dialog "If nothing printed, the selected printer" & return & return & "      " & thePrinter & return & return & "may be offline. If so, please cancel the print job and select a different printer." buttons {"OK"} with title msgTitle 
+					display dialog "If nothing printed, the selected printer" & return & return & "      " & thePrinter & return & return & "may be offline. If so, I can either abandon the print job or create a PDF on the desktop." buttons {"Abandon", "Desktop PDF"} with title msgTitle 
+					if button returned of result is "Desktop PDF" then
+						try
+						set timeNow to do shell script "date '+%F_%H:%M:%S' "
+						do shell script "cp" & space & pdfPosix & space & quoted form of  ("$HOME/Desktop/" & timeNow & ".pdf")
+						on error err
+							display dialog err
+						end try
+					end if
+					do shell script "rm " & pdfPosix
 				end tell
 			end if
 		
