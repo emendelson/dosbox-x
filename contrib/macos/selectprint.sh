@@ -70,7 +70,7 @@ osascript - "$PDF" <<EndOfScript
 		
 			delay 1
 			set prtDone to false
-			repeat with i from 1 to 5 --CHANGE BACK TO 20
+			repeat with j from 1 to 20
 				try
 					set ptrState to do shell script "lpq -P " & "\"" & theQueue & "\""
 					if ptrState contains "entries" then
