@@ -4,12 +4,15 @@
 
 cd "$(dirname "$0")"
 
-./gpcl6 -dBATCH -dNOPAUSE -sDEVICE=txtwrite -sOutputFile=pcltemp.txt clip.txt
-# ./gs -dBATCH -dNOPAUSE -sDEVICE=txtwrite -sOutputFile=pcltemp.txt pstemp.ps
+./gpcl6 -dBATCH -dNOPAUSE -sDEVICE=txtwrite -sOutputFile=pcltemp.txt "$1"
+
+export LANG="en_US.UTF-8"
 
 cat pcltemp.txt | pbcopy
+
 rm "$1"
+
 rm pcltemp.txt
-# rm pstemp.ps
+
 
 
