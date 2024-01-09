@@ -1,0 +1,191 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE dictionary SYSTEM "file://localhost/System/Library/DTDs/sdef.dtd">
+
+<dictionary title="Bonjour Events Terminology">
+	<suite name="Standard Suite" code="????" description="Common classes and commands for all applications.">
+		
+        <command name="count" code="corecnte" description="Return the number of elements of a particular class within an object.">
+			<cocoa class="NSCountCommand"/>
+			<direct-parameter type="specifier" description="The objects to be counted."/>
+			<parameter name="each" code="kocl" type="type" optional="yes" description="The class of objects to be counted." hidden="yes">
+				<cocoa key="ObjectClass"/>
+			</parameter>
+			<result type="integer" description="The count."/>
+		</command>
+        
+        <command name="delete" code="coredelo" description="Delete an object.">
+            <cocoa class="NSDeleteCommand"/>
+            <direct-parameter type="specifier" description="the object to delete"/>
+        </command>
+
+        <command name="exists" code="coredoex" description="Verify that an object exists.">
+			<cocoa class="NSExistsCommand"/>
+			<direct-parameter type="any" description="The object(s) to check."/>
+			<result type="boolean" description="Did the object(s) exist?"/>
+		</command>
+        
+        <command name="make" code="corecrel" description="Make a new object.">
+            <cocoa class="SKCreateCommand"/>
+            <parameter name="new" code="kocl" type="type"
+                description="The class of the new object.">
+                <cocoa key="ObjectClass"/>
+            </parameter>
+            <parameter name="at" code="insh" type="location specifier" optional="yes"
+                description="The location at which to insert the object.">
+                <cocoa key="Location"/>
+            </parameter>
+            <parameter name="with data" code="data" type="any" optional="yes"
+                description="The initial contents of the object.">
+                <cocoa key="ObjectData"/>
+            </parameter>
+            <parameter name="with properties" code="prdt" type="record" optional="yes"
+                description="The initial values for properties of the object.">
+                <cocoa key="KeyDictionary"/>
+            </parameter>
+            <result type="specifier" description="to the new object"/>
+        </command>
+
+		<class name="application" code="capp" description="The application's top-level scripting object.">
+			<cocoa class="NSApplication"/>
+			<property name="name" code="pnam" type="text" access="r" description="The name of the application."/>
+			<property name="frontmost" code="pisf" type="boolean" access="r" description="Is this the active application?">
+				<cocoa key="isActive"/>
+			</property>
+			<property name="version" code="vers" type="text" access="r" description="The version number of the application."/>
+			<responds-to name="quit">
+				<cocoa method="handleQuitScriptCommand:"/>
+			</responds-to>
+		</class>
+		
+	</suite>
+	
+	<suite name="Bonjour Events Suite" code="bJEv" description="Classes for the Display Events application.">
+        
+        <record-type name="scan reply" code="SrPy">
+            <property name="timed out" code="rPTo" type="boolean" access="r"
+                description="did the scan process time out">
+                <cocoa key="replyTimedOut"/>
+            </property>
+            <property name="bonjour services" code="rPSv" access="r"
+                description="found services">
+                <type type="service" list="yes"/>
+                <cocoa key="replyServices"/>
+            </property>
+            <property name="scan error" code="rPeR" type="text" access="r"
+                description="error reason if there is any">
+                <cocoa key="replyError"/>
+            </property>
+        </record-type>
+		
+        <class name="application" code="capp" description="application's add-ons." inherits="application">
+			<cocoa class="NSApplication"/>
+            <property name="quit delay" code="qdel" type="integer" description="the time in seconds the application will idle before quitting; if set to zero, idle time will not cause the application to quit"/>
+            <element type="browser" description="A bonjour browser">
+                <cocoa key="bonjourBrowser"/>
+            </element>
+        </class>
+        
+        <class name="browser" code="BrWs" description="A Bonjour browser.">
+            <cocoa class="BonjourBrowser"/>
+            <element type="service" description="The displayed bonjour services">
+                <cocoa key="serviceArray"/>
+            </element>
+            <property name="name" code="pnam" type="text" description="The name of the browser">
+                <cocoa key="browserName"/>
+            </property>
+            <property name="service type" code="bStP" type="text" description="The type of the browser.">
+                <cocoa key="browserType"/>
+            </property>
+            <property name="domain" code="bSdM" type="text" description="The domain of the browser">
+                <cocoa key="browserDomain"/>
+            </property>
+            <property name="is scanning" code="iSCn" type="boolean" access="r" description="is the browser scanning."/>
+            <responds-to command="stop">
+                <cocoa method="stopBrowser:"/>
+            </responds-to>
+            <responds-to command="scan">
+                <cocoa method="scan:"/>
+            </responds-to>
+        </class>
+
+        <class name="service" code="bSvC" access="r" description="A bonjour service.">
+			<cocoa class="BonjourService"/>
+            <property name="name" code="pnam" type="text" access="r" description="The name of the service.">
+				<cocoa key="serviceName"/>
+			</property>
+            <property name="id" code="ID  " type="text" access="r" description="The identifier of the service.">
+				<cocoa key="serviceID"/>
+			</property>
+            <property name="host" code="bShT" type="text" access="r" description="The host of the service.">
+				<cocoa key="serviceHost"/>
+			</property>
+            <property name="port" code="ppor" type="integer" access="r" description="The port of the service.">
+				<cocoa key="servicePort"/>
+			</property>
+			<property name="domain" code="bSdM" type="text" access="r" description="The domain of the service.">
+                <cocoa key="serviceDomain"/>
+            </property>
+			<property name="IPv4 address" code="iPVf" type="text" access="r" description="The IPv4 address of the service.">
+				<cocoa key="serviceIPv4Address"/>
+			</property>
+			<property name="IPv6 address" code="iPVs" type="text" access="r" description="The IPv6 address of the service.">
+				<cocoa key="serviceIPv6Address"/>
+			</property>
+            <property name="service type" code="bStP" type="text" access="r" description="The type of the service.">
+				<cocoa key="serviceType"/>
+			</property>
+		</class>
+        
+        <command name="scan" code="bJEvSCan" description="scan.">
+            <direct-parameter type="browser" description="The current bonjour browser."/>
+            <parameter name="for type" code="ftYP" type="text" optional="yes"
+				description="The type to search e.g. _afpovertcp._tcp.">
+				<cocoa key="scanType"/>
+			</parameter>
+            <parameter name="in domain" code="iDmN" type="text" optional="yes"
+				description="The domain to search in e.g. local.">
+				<cocoa key="scanDomain"/>
+			</parameter>
+            <parameter name="time out after" code="TotA" type="real" optional="yes"
+				description="time out after n seconds (default 5).">
+				<cocoa key="timeOutAfter"/>
+			</parameter>
+            <parameter name="target" code="tARg" type="script" optional="yes"
+                description="Callback handling script for scan.">
+                <cocoa key="Target"/>
+            </parameter>
+            <result type="scan reply" description="A record of scan reply parameters"/>
+		</command>
+        
+        <command name="host for URL" code="bJEvhFUl" description="extracts the host name for a given URL.">
+            <cocoa class="HostForURLCommand"/>
+            <direct-parameter type="text" description="the (escaped) URL"/>
+            <result type="text" description="The host name"/>
+        </command>
+        
+        <command name="stop" code="bJEvsTPb" description="stops the bonjour browser.">
+            <direct-parameter type="browser" description="The current bonjour browser."/>
+         </command>
+
+        <event name="did appear services" code="bJEvaDsV" description="This handler is called when one or multiple Bonjour services appear.">
+          <!--  <cocoa name="didAppearServices" class="SKEventHandlerCommand"/> -->
+            <direct-parameter description="The appeared services.">
+                 <type type="service" list="yes"/>
+            </direct-parameter>
+            <parameter name="of browser" code="ofBR" description="The Bonjour browser." type="browser"/>
+            <parameter name="with result" code="sCrS" description="A record of scan reply parameters" type="scan reply"/>
+        </event>
+
+        <event name="did disappear services" code="bJEvrMsV" description="This handler is called when one or multiple Bonjour services disappear.">
+            <direct-parameter description="The host names of the disappeared services.">
+                <type type="text" list="yes"/>
+            </direct-parameter>
+            <parameter name="of browser" code="ofBR" description="The Bonjour browser." type="browser"/>
+        </event>
+        
+        <value-type name="script" code="scpt">
+            <cocoa class="NSAppleScript"/>
+        </value-type>
+    </suite>
+   
+</dictionary>

@@ -22,3 +22,4 @@ rm temp.ps
 rm "$1"
 
 source ./selectprint.sh
+exit

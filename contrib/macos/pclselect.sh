@@ -18,3 +18,4 @@ DIR=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
 PDF=("$DIR"/select.pdf)
 
 source ./selectprint.sh
+exit
