@@ -10,7 +10,6 @@ CODEPAGE="CP850"
 if [ $LOC = "en_US" ] || [ $LOC = "en_CA" ] ; then
    CODEPAGE="CP437"
 fi
-export LANG="$LOC.UTF-8"
 
 iconv -f $CODEPAGE -t UTF-8 "$1" > new.txt
 
