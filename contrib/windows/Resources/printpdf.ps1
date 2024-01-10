@@ -1,0 +1,1 @@
+ Get-Content -Path "C:\Users\Edward\AppData\Local\Temp\out.pdf" | Out-Printer
