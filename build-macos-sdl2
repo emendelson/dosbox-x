@@ -155,10 +155,3 @@ for arch in ${architectures}; do
 
     cp src/dosbox-x "src/dosbox-x-${arch}"
 done
-
-rm -f dosbox-x.app || true
-rm -f dosbox-x-SDL2.app || true
-make dosbox-x.app
-mv -f dosbox-x.app dosbox-x-SDL2.app
-cp -R contrib/macos/BonjourEvents.app ./dosbox-x-SDL1.app/Contents/Resources
-open ./dosbox-x-SDL2.app
