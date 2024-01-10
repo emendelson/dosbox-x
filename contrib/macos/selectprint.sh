@@ -13,7 +13,6 @@ use scripting additions
 on run argv
 	
 	set pdfPosix to argv
-	
 	set msgTitle to "DOSBox-X Printing"
 	
 	set thePrinter to ""
@@ -24,6 +23,15 @@ on run argv
 	
 	set printerList to (every paragraph of printerNames) as list
 	set queueList to (every paragraph of queueNames) as list
+	
+	if printerList is {} then
+		tell application "System Events"
+			activate
+			display dialog "No printers found" buttons {"OK"} with title msgTitle
+		end tell
+		do shell script "rm" & space & pdfPosix
+		return
+	end if
 	
 	if the (count of printerList) is 1 then
 		
@@ -43,9 +51,10 @@ on run argv
 			
 			tell application "System Events"
 				activate
-				display dialog "Printing cancelled." buttons {"OK"} default button 1 with title msgTitle giving up after 3
+				display dialog "Printing cancelled." buttons {"OK"} default button 1 with title msgTitle giving up after 2
 			end tell
 			do shell script "rm " & pdfPosix
+			return
 			
 		else
 			
@@ -59,16 +68,15 @@ on run argv
 			
 			set theQueue to item item_num in queueList
 			
-			--if noPrinters = 0 then
+			(*
 			try
 				set printerList to (every paragraph of printerNames) as list
 				set queueList to (every paragraph of queueNames) as list
 			end try
-			tell me to activate
+			*)
 			
 			set dnsURL to do shell script "lpstat -v " & theQueue
 			set dnsString to (do shell script "perl -e 'use URI::Escape; print uri_unescape(\"" & dnsURL & "\")';")
-			
 			
 			try
 				tell application "./BonjourEvents.app"
@@ -86,7 +94,6 @@ on run argv
 							set nameList to {}
 							set addressList to {}
 						end if
-						
 						quit
 						-- Bonjour Events quits automatically after 2 minutes of inactivity
 					end tell
@@ -110,7 +117,7 @@ on run argv
 			if ipPrinterFound is false then
 				tell application "System Events"
 					activate
-					display dialog thePrinter & " may be offline." & return & return & "Try to print anyway?" buttons {"No", "Yes"} default button 1 with title msgTitle
+					display dialog thePrinter & " may be offline." & return & return & "If you know the printer exists, should I try to print anyway?" buttons {"No", "Yes"} default button 1 with title msgTitle
 					if button returned of result is "No" then
 						do shell script "rm " & pdfPosix
 						return
@@ -119,12 +126,12 @@ on run argv
 			end if
 			
 			try
-				do shell script "lpr -P " & "\"" & theQueue & "\"" & " " & pdfPosix
+				do shell script "lpr -rP " & "\"" & theQueue & "\"" & " " & pdfPosix
 			on error err
 				tell application "System Events"
 					activate
-					display dialog err
-					display dialog "Could not send PDF file to printer." buttons {"OK"} with title msgTitle giving up after 10
+					display dialog err & return & return & "Could not send PDF file to printer." buttons {"OK"} with title msgTitle giving up after 10
+				return
 				end tell
 			end try
 			
