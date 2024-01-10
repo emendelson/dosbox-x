@@ -21,5 +21,8 @@ fi
 rm temp.ps
 rm "$1"
 
-source ./selectprint.sh 
+DIR=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
+PDF=("$DIR/select.pdf")
+
+source ./selectprint.sh "$PDF"
 exit

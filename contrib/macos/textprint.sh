@@ -25,7 +25,7 @@ rm temp.ps
 rm "$1"
 
 DIR=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
-PDF=("$DIR"/temp.pdf)
+PDF=("$DIR/temp.pdf")
 
 source ./defaultprint.sh "$PDF"
 exit

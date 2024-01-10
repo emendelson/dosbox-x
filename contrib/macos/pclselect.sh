@@ -15,7 +15,7 @@ fi
 rm "$1"
 
 DIR=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
-PDF=("$DIR"/select.pdf)
+PDF=("$DIR/select.pdf")
 
-source ./selectprint.sh
+source ./selectprint.sh "$PDF"
 exit

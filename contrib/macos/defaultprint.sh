@@ -16,7 +16,7 @@ use scripting additions
 on run argv 
 
 	set pdfPosix to argv
-	-- display dialog pdfPosix
+	set pdfPosix to "\"" & pdfPosix & "\""
 	
 	set msgTitle to "DOSBox-X Printing"
 
