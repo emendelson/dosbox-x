@@ -21,6 +21,10 @@
 	<dict>
 		<key>Resources/Base.lproj/MainMenu.nib</key>
 		<dict>
+			<key>hash</key>
+			<data>
+			+P5IKv+ufXkJZN6GxBCrfqZThwE=
+			</data>
 			<key>hash2</key>
 			<data>
 			1BoKt7ykvsCkx4Coi+BiIRXeLcTXt5f6Bz5kN3+tVDQ=
@@ -28,6 +32,10 @@
 		</dict>
 		<key>Resources/BonjourEvents.sdef</key>
 		<dict>
+			<key>hash</key>
+			<data>
+			IB2UMRkFhydyxZCM7NQuSOakE5M=
+			</data>
 			<key>hash2</key>
 			<data>
 			7Tc+m7ewoEPLW34MYmnOuoW9kwGqgi9V+F+7to7hDCI=
@@ -35,6 +43,10 @@
 		</dict>
 		<key>Resources/Localizable.strings</key>
 		<dict>
+			<key>hash</key>
+			<data>
+			TPJ6eL4pAxP5DRjT5IQ1Re1zpPw=
+			</data>
 			<key>hash2</key>
 			<data>
 			3P98kPTsbvh9M1OrRq95Pkfocs/FuZomnV915Y6rTTM=
