@@ -33,11 +33,11 @@ echo WMIC is not available, using default log filename
 Set logtimestamp=_
 
 :make_dump
-rem set FILENAME=%UserProfile%\Desktop\%logtimestamp%.pdf
-set FILENAME=%USERPROFILE%\Desktop\%logtimestamp%.pdf
+set FILENAME=%UserProfile%\Desktop\%logtimestamp%.pdf
 
-..\PrintApps\gswin32c.exe -dBATCH -dNOPAUSE -sDEVICE=pdfwrite -sOutputFile=%FILENAME% %1
+gswin32c.exe -dBATCH -dNOPAUSE -sDEVICE=pdfwrite -sOutputFile=%FILENAME% %1
 del %1
 
 start %FILENAME%
+
 exit

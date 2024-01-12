@@ -34,17 +34,14 @@ Set logtimestamp=_
 
 :make_dump
 
-rem set FILENAME=%UserProfile%\Desktop\%logtimestamp%.pdf
-rem set FILENAME=%TEMP%\%logtimestamp%.pdf
 set FILENAME=%TEMP%\%logtimestamp%.pdf
 
 start /wait /min gswin32c.exe -dBATCH -dNOPAUSE -sDEVICE=pdfwrite -sOutputFile=%FILENAME% print.prn
 del print.prn
 
-start /wait /min PDFXCview.exe /print %FILENAME%
+powershell.exe -ExecutionPolicy Bypass -File .\printpdf.ps1 %FILENAME%
 
-delete %FILENAME%
-delete %FILENAME%
+rem del %FILENAME%
 
 rem start %FILENAME%
 

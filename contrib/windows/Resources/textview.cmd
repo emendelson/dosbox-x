@@ -33,13 +33,42 @@ echo WMIC is not available, using default log filename
 Set logtimestamp=_
 
 :make_dump
+
+@ECHO OFF
+SETLOCAL DisableDelayedExpansion    
+FOR /F "tokens=1,3 delims=:; " %%I IN ('%SystemRoot%\System32\systeminfo.exe 2^>nul ^| %SystemRoot%\System32\find.exe ";"') DO SET "Locale%%I=%%J"
+
+rem Above retuns LocaleSystem and LocaleInput (two letters)
+
+set "codepage=850"
+set "PAPER=-pps7"
+if %LocaleSystem%==en-us (
+	set "codepage=437"
+	set "PAPER=-pps0"
+)
+if %LocaleSystem%==en-ca (
+	set "codepage=437"
+	set "PAPER=-pps0"
+)
+
+rem win_iconv.exe -f 850 -t 1252 %1 >1252.txt
+win_iconv.exe -f %codepage% -t 1252 %1 >1252.txt
+
 rem set FILENAME=%UserProfile%\Desktop\%logtimestamp%.pdf
 set FILENAME=%TEMP%\%logtimestamp%.pdf
 
 rem https://www.verypdf.com/txt2pdf/help.htm
 rem -pps0 is letter, -pps7 is A4
-txt2pdf.exe %1 %FILENAME% -pfs10 -pfc100 -pffCourier 
-del %1
+txt2pdf.exe 1252.txt %FILENAME% %PAPER% -pfs10 -pfc100 -pffCourier 
+rem txt2pdf.exe %1 "%USERPROFILE%\desktop\a.pdf" %PAPER% -pfs10 -pfc100 -pffCourier 
 
-start %FILENAME%
+rem start /wait /min PDFXCview.exe /print %FILENAME%
+
+delete %1
+delete 1252.txt
+start	%FILENAME%
+
+rem delete %FILENAME%
+
 exit
+
