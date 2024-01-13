@@ -41,14 +41,14 @@ FOR /F "tokens=1,3 delims=:; " %%I IN ('%SystemRoot%\System32\systeminfo.exe 2^>
 rem Above retuns LocaleSystem and LocaleInput (two letters)
 
 set "codepage=850"
-set "PAPER=-pps7"
+set "papertype=A4"
 if %LocaleSystem%==en-us (
 	set "codepage=437"
-	set "PAPER=-pps0"
+	set "papertype=US"
 )
 if %LocaleSystem%==en-ca (
 	set "codepage=437"
-	set "PAPER=-pps0"
+	set "papertype=US"
 )
 
 rem win_iconv.exe -f 850 -t 1252 %1 >1252.txt
@@ -60,12 +60,14 @@ TIMEOUT /T 1 >nul
 GOTO CheckForFile
 :FoundIt
 
+rem timeout /t 1
+
+rem set FILENAME=%UserProfile%\Desktop\%logtimestamp%.pdf
 set FILENAME=%TEMP%\%logtimestamp%.pdf
 
-rem https://www.verypdf.com/txt2pdf/help.htm
-rem -pps0 is letter, -pps7 is A4
-rem txt2pdf.exe 1252.txt %FILENAME% %PAPER% -pfs10 -pf/c100 -pffCourier 
-start /wait /min Write.exe /pt ./1252.txt "Microsoft Print to PDF" "Microsoft Print to PDF" %FILENAME%
+nenscript -ptemp.ps -fCourier9 -B -T%papertype% 1252.txt
+
+gswin32c.exe -dBATCH -dNOPAUSE -sDEVICE=pdfwrite -sOutputFile=%FILENAME% temp.ps
 
 :CheckForSecondFile
 IF EXIST %FILENAME% GOTO FoundIt
@@ -76,6 +78,7 @@ GOTO CheckForSecondFile
 powershell.exe -ExecutionPolicy Bypass -File .\printpdf.ps1 %FILENAME%
 
 del 1252.txt
+del temp.ps
 del %1
 del %FILENAME%
 
