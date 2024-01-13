@@ -1134,3 +1134,7 @@ devicehigh  =
 [autoexec]
 # Lines in this section will be run at startup.
 # You can put your MOUNT lines here.
+echo Added to build.
+mount e e:\
+e:
+cd wp51
