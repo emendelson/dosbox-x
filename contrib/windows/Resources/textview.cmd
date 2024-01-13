@@ -77,7 +77,8 @@ GOTO CheckForSecondFile
 :FoundIt
 
 del %1
-rem del 1252.txt
+del 1252.txt
+
 start %FILENAME%
 rem delete %FILENAME%
 

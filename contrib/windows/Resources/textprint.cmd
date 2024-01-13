@@ -75,9 +75,9 @@ GOTO CheckForSecondFile
 
 powershell.exe -ExecutionPolicy Bypass -File .\printpdf.ps1 %FILENAME%
 
-del %FILENAME%
 del 1252.txt
 del %1
+del %FILENAME%
 
 exit
 

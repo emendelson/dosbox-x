@@ -76,33 +76,12 @@ TIMEOUT /T 1 >nul
 GOTO CheckForSecondFile
 :FoundIt
 
-rem timeout /t 1 >nul
+timeout /t 1 >nul
 
 del %1
-rem del 1252.txt
+del 1252.txt
+
 start %FILENAME%
 rem delete %FILENAME%
 
 exit
-
-
-rem -------------
-
-rem win_iconv.exe -f 850 -t 1252 %1 >1252.txt
-win_iconv.exe -f %codepage% -t 1252 %1 >1252.txt
-
-set FILENAME=%UserProfile%\Desktop\%logtimestamp%.pdf
-rem FILENAME=%TEMP%\%logtimestamp%.pdf
-
-rem https://www.verypdf.com/txt2pdf/help.htm
-rem -pps0 is letter, -pps7 is A4
-txt2pdf.exe 1252.txt %FILENAME% %PAPER% -pfs10 -pfc100 -pffCourier 
-
-rem dirstart /wait /min PDFXCview.exe /print %FILENAME%
-
-rem delete %FILENAME%
-del 1252.txt
-del %1
-
-exit
-
