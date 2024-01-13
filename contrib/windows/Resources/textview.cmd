@@ -68,7 +68,7 @@ set FILENAME=%TEMP%\%logtimestamp%.pdf
 rem https://www.verypdf.com/txt2pdf/help.htm
 rem -pps0 is letter, -pps7 is A4
 rem txt2pdf.exe 1252.txt %FILENAME% %PAPER% -pfs10 -pf/c100 -pffCourier 
-start /wait /min Write.exe /pt ./1252.txt "Microsoft Print to PDF" "Microsoft Print to PDF" %FILENAME%
+start /wait /min Write.exe /pt ./1252.txt "Microsoft Print to PDF" "Microsoft Print to PDF" %FILENAME% 
 
 :CheckForSecondFile
 IF EXIST %FILENAME% GOTO FoundIt
@@ -76,8 +76,8 @@ TIMEOUT /T 1 >nul
 GOTO CheckForSecondFile
 :FoundIt
 
-del %1
 del 1252.txt
+del %1
 
 start %FILENAME%
 rem delete %FILENAME%
