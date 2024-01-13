@@ -37,7 +37,7 @@ rem set FILENAME=%UserProfile%\Desktop\%logtimestamp%.pdf
 set FILENAME=%TEMP%\%logtimestamp%.pdf
 
 gswin32c.exe -dBATCH -dNOPAUSE -sDEVICE=pdfwrite -sOutputFile=%FILENAME% %1
-del view.prn
+del %1
 
 start %FILENAME%
 exit

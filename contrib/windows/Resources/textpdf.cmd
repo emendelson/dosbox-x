@@ -66,5 +66,6 @@ rem dirstart /wait /min PDFXCview.exe /print %FILENAME%
 rem delete %FILENAME%
 del 1252.txt
 del %1
+
 exit
 

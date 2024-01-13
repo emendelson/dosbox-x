@@ -35,7 +35,7 @@ Set logtimestamp=_
 :make_dump
 set FILENAME=%UserProfile%\Desktop\%logtimestamp%.pdf
 
-pcl6.exe -dBATCH -dNOPAUSE -sDEVICE=pdfwrite -sOutputFile=%FILENAME% %1
+gpcl6win32.exe -dBATCH -dNOPAUSE -sDEVICE=pdfwrite -sOutputFile=%FILENAME% %1
 del %1
 
 start %FILENAME%

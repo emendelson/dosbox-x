@@ -36,10 +36,8 @@ Set logtimestamp=_
 rem set FILENAME=%UserProfile%\Desktop\%logtimestamp%.pdf
 set FILENAME=%TEMP%\%logtimestamp%.pdf
 
-pcl6.exe -dBATCH -dNOPAUSE -sDEVICE=textwrite -sOutputFile=pcltemp.txt %1
+gpcl6win32.exe -dBATCH -dNOPAUSE -sDEVICE=pdfwrite -sOutputFile=%FILENAME% %1
 del %1
 
-type pcltemp.txt > clip.exe
-del pcltemp.txt
-
+start %FILENAME%
 exit

@@ -54,6 +54,12 @@ if %LocaleSystem%==en-ca (
 rem win_iconv.exe -f 850 -t 1252 %1 >1252.txt
 win_iconv.exe -f %codepage% -t 1252 %1 >1252.txt
 
+:CheckForFile
+IF EXIST 1252.txt GOTO FoundIt
+TIMEOUT /T 1 >nul
+GOTO CheckForFile
+:FoundIt
+
 set FILENAME=%TEMP%\%logtimestamp%.pdf
 
 rem https://www.verypdf.com/txt2pdf/help.htm

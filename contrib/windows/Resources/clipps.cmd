@@ -21,6 +21,12 @@ gswin32c.exe -dBATCH -dNOPAUSE -sDEVICE=txtwrite -sOutputFile=pstemp.txt %1
 
 win_iconv.exe -f UTF8 -t %codepage% pstemp.txt > forclip.txt
 
+:CheckForFile
+IF EXIST forclip.txt GOTO FoundIt
+TIMEOUT /T 1 >nul
+GOTO CheckForFile
+:FoundIt
+
 clip < forclip.txt
 
 del %1

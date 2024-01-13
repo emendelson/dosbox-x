@@ -18,7 +18,7 @@ FOR /F "skip=1 tokens=1-6" %%G IN ('WMIC Path Win32_LocalTime Get Day^,Hour^,Min
 )
 :s_done
 
-:: Pad digits with leading zeros
+:: Pad digits with leading zeros 
       Set _mm=%_mm:~-2%
       Set _dd=%_dd:~-2%
       Set _hour=%_hour:~-2%

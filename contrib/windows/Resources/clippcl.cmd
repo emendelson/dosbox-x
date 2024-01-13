@@ -17,11 +17,7 @@ if %LocaleSystem%==en-ca (
 	set "codepage=437"
 )
 
-pcl6.exe -dBATCH -dNOPAUSE -sDEVICE=pdfwrite -sOutputFile=pcltemp.pdf %1
-
-gswin32c.exe -dBATCH -dNOPAUSE -sDEVICE=ps2write -sOutputFile=pcltemp.ps pcltemp.pdf
-
-gswin32c.exe -dBATCH -dNOPAUSE -sDEVICE=txtwrite -sOutputFile=pcltemp.txt pcltemp.ps
+gpcl6win32.exe -dBATCH -dNOPAUSE -sDEVICE=txtwrite -sOutputFile=pcltemp.txt %1
 
 win_iconv.exe -f UTF8 -t %codepage% pcltemp.txt > forclip.txt
 
@@ -33,8 +29,6 @@ GOTO CheckForFile
 
 clip < forclip.txt
 
-del pcltemp.pdf
-del pcltemp.ps
 del pcltemp.txt
 del forclip.txt
 del %1
