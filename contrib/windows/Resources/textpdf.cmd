@@ -54,6 +54,43 @@ if %LocaleSystem%==en-ca (
 rem win_iconv.exe -f 850 -t 1252 %1 >1252.txt
 win_iconv.exe -f %codepage% -t 1252 %1 >1252.txt
 
+:CheckForFile
+IF EXIST 1252.txt GOTO FoundIt
+TIMEOUT /T 1 >nul
+GOTO CheckForFile
+:FoundIt
+
+rem timeout /t 1
+
+set FILENAME=%UserProfile%\Desktop\%logtimestamp%.pdf
+rem set FILENAME=%TEMP%\%logtimestamp%.pdf
+
+rem https://www.verypdf.com/txt2pdf/help.htm
+rem -pps0 is letter, -pps7 is A4
+rem txt2pdf.exe 1252.txt %FILENAME% %PAPER% -pfs10 -pf/c100 -pffCourier 
+start /wait /min Write.exe /pt ./1252.txt "Microsoft Print to PDF" "Microsoft Print to PDF" %FILENAME%
+
+:CheckForSecondFile
+IF EXIST %FILENAME% GOTO FoundIt
+TIMEOUT /T 1 >nul
+GOTO CheckForSecondFile
+:FoundIt
+
+rem timeout /t 1 >nul
+
+del %1
+rem del 1252.txt
+start %FILENAME%
+rem delete %FILENAME%
+
+exit
+
+
+rem -------------
+
+rem win_iconv.exe -f 850 -t 1252 %1 >1252.txt
+win_iconv.exe -f %codepage% -t 1252 %1 >1252.txt
+
 set FILENAME=%UserProfile%\Desktop\%logtimestamp%.pdf
 rem FILENAME=%TEMP%\%logtimestamp%.pdf
 
