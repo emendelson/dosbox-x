@@ -41,6 +41,8 @@ del print.prn
 
 powershell.exe -ExecutionPolicy Bypass -File .\printpdf.ps1 %FILENAME%
 
-del %FILENAME%
+rem del %FILENAME%
+
+rem start %FILENAME%
 
 exit

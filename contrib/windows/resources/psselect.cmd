@@ -36,10 +36,10 @@ Set logtimestamp=_
 
 set FILENAME=%TEMP%\%logtimestamp%.pdf
 
-start /wait /min gswin32c.exe -dBATCH -dNOPAUSE -sDEVICE=pdfwrite -sOutputFile=%FILENAME% print.prn
-del print.prn
+start /wait /min gswin32c.exe -dBATCH -dNOPAUSE -sDEVICE=pdfwrite -sOutputFile=%FILENAME% select.prn
+del select.prn
 
-powershell.exe -ExecutionPolicy Bypass -File .\printpdf.ps1 %FILENAME%
+powershell.exe -ExecutionPolicy Bypass -File .\selectpdf.ps1 %FILENAME%
 
 del %FILENAME%
 
