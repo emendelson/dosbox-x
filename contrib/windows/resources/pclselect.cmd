@@ -39,7 +39,7 @@ set FILENAME=%TEMP%\%logtimestamp%.pdf
 start /wait /min gpcl6win32.exe -dBATCH -dNOPAUSE -sDEVICE=pdfwrite -sOutputFile=%FILENAME% print.prn
 del print.prn
 
-powershell.exe -ExecutionPolicy Bypass -File .\selectpdf.ps1 %FILENAME%
+powershell.exe -ExecutionPolicy Bypass -WindowStyle Hidden -File .\selectpdf.ps1 %FILENAME%
 del %FILENAME%
 
 exit

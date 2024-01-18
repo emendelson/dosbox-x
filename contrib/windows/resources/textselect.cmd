@@ -76,7 +76,7 @@ TIMEOUT /T 1 >nul
 GOTO CheckForSecondFile
 :FoundIt
 
-powershell.exe -ExecutionPolicy Bypass -File .\selectpdf.ps1 %FILENAME%
+powershell.exe -ExecutionPolicy Bypass -WindowStyle Hidden -File .\selectpdf.ps1 %FILENAME%
 del 1252.txt
 del temp.ps
 del %1
