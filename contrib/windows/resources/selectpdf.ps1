@@ -2,6 +2,8 @@ param(
 [string]$fn
 )
 
+Add-Type -AssemblyName System.Windows.Forms | Out-Null
+
 Clear-Host
 
 <#
@@ -21,6 +23,7 @@ $printers = Get-Printer | Select-Object -Property Name
 
 # Check if there are any printers installed
 if ($printers.Count -eq 0) {
+		[System.Windows.Forms.MessageBox]::Show('No printers are installed.', 'DOSBox-X Printing')
     Write-Host "No printers are installed."
     exit
 }
