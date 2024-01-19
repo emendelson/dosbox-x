@@ -2,44 +2,72 @@ param(
 [string]$fn
 )
 
-Add-Type -AssemblyName System.Windows.Forms | Out-Null
-
 Clear-Host
 
-<#
-$printers = Get-Printer
-$menu = @{}
-for ($i=1;$i -le $printers.count; $i++) {
-    Write-Host "$i. $($printers[$i-1].name)" 
-    $menu.Add($i,($printers[$i-1].name))
-    } 
-[int]$ans = Read-Host 'Select a printer for this document'
-$selection = $menu.Item($ans)
-$choice = Get-Printer $selection
-#>
+# Load Windows Forms and drawing libraries
+Add-Type -AssemblyName System.Windows.Forms
+Add-Type -AssemblyName System.Drawing
 
-# Get the list of installed printers
-$printers = Get-Printer | Select-Object -Property Name
+# Create the form
+$form = New-Object System.Windows.Forms.Form
+$form.Text = 'Select a Printer'
+$form.Size = New-Object System.Drawing.Size(300,200)
+$form.StartPosition = 'CenterScreen'
 
-# Check if there are any printers installed
+# Add a label
+$label = New-Object System.Windows.Forms.Label
+$label.Location = New-Object System.Drawing.Point(10,10)
+$label.Size = New-Object System.Drawing.Size(280,20)
+$label.Text = 'Please select a printer:'
+$form.Controls.Add($label)
+
+# Add a list box
+$listBox = New-Object System.Windows.Forms.ListBox
+$listBox.Location = New-Object System.Drawing.Point(10,40)
+$listBox.Size = New-Object System.Drawing.Size(260,100)
+$form.Controls.Add($listBox)
+
+
+# Populate the list box with printer names
+$printers = Get-Printer | Select-Object -ExpandProperty Name
+
+# Check if no printers installed
 if ($printers.Count -eq 0) {
 		[System.Windows.Forms.MessageBox]::Show('No printers are installed.', 'DOSBox-X Printing')
     Write-Host "No printers are installed."
     exit
 }
 
-# Display the list of printers and prompt the user to select one
-$selection = $printers | Out-GridView -Title "Select a printer for this document" -PassThru
-
-# Check if the user made a selection
-if ($null -eq $selection) {
-    Write-Host "No printer selected."
-} else {
-    Write-Host "You selected: $($selection.Name)"
+# Finish populating list box
+foreach ($printer in $printers) {
+    $listBox.Items.Add($printer)
 }
 
-Clear-Host
+# Add a button
+$button = New-Object System.Windows.Forms.Button
+$button.Location = New-Object System.Drawing.Point(10,150)
+$button.Size = New-Object System.Drawing.Size(100,20)
+$button.Text = 'OK'
+$form.Controls.Add($button)
 
-Start-Process -FilePath $fn -Verb PrintTo("$($selection.Name)") -PassThru | %{sleep 10;$_} | kill
+# Add button click event
+$button.Add_Click({
+    $global:selectedPrinter = $listBox.SelectedItem
+    $form.Close()
+})
+
+# Show the form
+$form.Add_Shown({$form.Activate()})
+[void] $form.ShowDialog()
+
+# Output the selected printer
+if ($global:selectedPrinter) {
+    Write-Host "Selected printer: $global:selectedPrinter"
+    # [System.Windows.Forms.MessageBox]::Show("$selectedPrinter", 'DOSBox-X Printing')
+} else {
+    Write-Host "No printer selected."
+}
+
+Start-Process -FilePath $fn -Verb PrintTo("$selectedPrinter") -PassThru | %{sleep 10;$_} | kill 
 
 exit
