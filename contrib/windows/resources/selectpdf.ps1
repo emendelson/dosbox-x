@@ -68,6 +68,6 @@ if ($global:selectedPrinter) {
     Write-Host "No printer selected."
 }
 
-Start-Process -FilePath $fn -Verb PrintTo("$selectedPrinter") -PassThru | %{sleep 10;$_} | kill 
+Start-Process -FilePath $fn -Verb PrintTo "$selectedPrinter" -PassThru | %{sleep 10;$_} | kill 
 
 exit
