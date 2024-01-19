@@ -52,7 +52,7 @@ $form.Controls.Add($button)
 
 # Add button click event
 $button.Add_Click({
-    $global:selectedPrinter = $listBox.SelectedItem
+    $script:selectedPrinter = $listBox.SelectedItem
     $form.Close()
 })
 
@@ -62,7 +62,7 @@ $form.Add_Shown({$form.Activate()})
 
 # Output the selected printer
 if ($global:selectedPrinter) {
-    Write-Host "Selected printer: $global:selectedPrinter"
+    Write-Host "Selected printer: $selectedPrinter"
     # [System.Windows.Forms.MessageBox]::Show("$selectedPrinter", 'DOSBox-X Printing')
 } else {
     Write-Host "No printer selected."
