@@ -76,11 +76,11 @@ TIMEOUT /T 1 >nul
 GOTO CheckForSecondFile
 :FoundIt
 
-powershell.exe -ExecutionPolicy Bypass -WindowStyle Hidden -File .\selectpdf.ps1 %FILENAME%
+start /wait /min SelectPrinterAndPrint.exe %FILENAME%
+
 del 1252.txt
 del temp.ps
 del %1
-del %FILENAME%
 
 exit
 

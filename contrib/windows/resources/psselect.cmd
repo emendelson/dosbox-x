@@ -39,8 +39,10 @@ set FILENAME=%TEMP%\%logtimestamp%.pdf
 start /wait /min gswin32c.exe -dBATCH -dNOPAUSE -sDEVICE=pdfwrite -sOutputFile=%FILENAME% select.prn
 del select.prn
 
-powershell.exe -ExecutionPolicy Bypass -WindowStyle Hidden -File .\selectpdf.ps1 %FILENAME%
+rem powershell.exe -ExecutionPolicy Bypass -WindowStyle Hidden -File .\selectpdf.ps1 %FILENAME%
 
-del %FILENAME%
+start /wait /min SelectPrinterAndPrint.exe %FILENAME%
+
+rem del %FILENAME%
 
 exit

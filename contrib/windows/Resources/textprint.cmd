@@ -75,7 +75,9 @@ TIMEOUT /T 1 >nul
 GOTO CheckForSecondFile
 :FoundIt
 
-powershell.exe -ExecutionPolicy Bypass -File .\printpdf.ps1 %FILENAME%
+rem powershell.exe -ExecutionPolicy Bypass -File .\printpdf.ps1 %FILENAME%
+
+start /wait /min PDFXCview.exe /print %FILENAME%
 
 del 1252.txt
 del temp.ps
