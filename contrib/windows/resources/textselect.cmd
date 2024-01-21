@@ -76,7 +76,7 @@ TIMEOUT /T 1 >nul
 GOTO CheckForSecondFile
 :FoundIt
 
-start /wait /min SelectPrinterAndPrint.exe %FILENAME%
+start /wait /min SelectPrinterForPDF.exe %FILENAME%
 
 del 1252.txt
 del temp.ps
