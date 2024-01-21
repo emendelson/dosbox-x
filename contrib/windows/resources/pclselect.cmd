@@ -41,7 +41,7 @@ del select.prn
 
 rem powershell.exe -ExecutionPolicy Bypass -WindowStyle Hidden -File .\selectpdf.ps1 %FILENAME%
 
-start /wait /min SelectPrinterAndPrint.exe %FILENAME%
+start /wait /min SelectPrinterForPDF.exe %FILENAME%
 
 rem del %FILENAME%
 
