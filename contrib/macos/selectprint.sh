@@ -102,17 +102,21 @@ on run argv
 				display dialog "An error occurred: " & errorMessage & " (" & errorNumber & ")"
 			end try
 			
-			set ipPrinterFound to false
-			repeat with currentItem in nameList
-				if currentItem is in dnsString then
-					set ipPrinterFound to true
-					-- set currentListItem to currentItem as item
-					-- set dnsNumber to my list_position(currentListItem, nameList)
-					-- set printerIP to item dnsNumber in addressList
-					-- display dialog thePrinter & return & return & "has the DNS instance name" & return & return & currentItem & return & return & "IP address:" & space & printerIP & return & return & "queue name:" & space & theQueue buttons {"OK"}
-					exit repeat
-				end if
-			end repeat
+			if thePrinter is "PDFWriter" then
+				set ipPrinterFound to true
+			else 
+				set ipPrinterFound to false
+				repeat with currentItem in nameList
+					if currentItem is in dnsString then
+						set ipPrinterFound to true
+						-- set currentListItem to currentItem as item
+						-- set dnsNumber to my list_position(currentListItem, nameList)
+						-- set printerIP to item dnsNumber in addressList
+						-- display dialog thePrinter & return & return & "has the DNS instance name" & return & return & currentItem & return & return & "IP address:" & space & printerIP & return & return & "queue name:" & space & theQueue buttons {"OK"}
+						exit repeat
+					end if
+				end repeat
+			end if  -- end of PDFWriter test
 			
 			if ipPrinterFound is false then
 				tell application "System Events"

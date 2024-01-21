@@ -65,16 +65,20 @@ on run argv
 	set dnsURL to do shell script "lpstat -v " & printerName
 	set dnsString to (do shell script "perl -e 'use URI::Escape; print uri_unescape(\"" & dnsURL & "\")';")
 	
-	set ipPrinterFound to false
-	repeat with currentItem in nameList
-		if currentItem is in dnsString then
-			set ipPrinterFound to true
-			exit repeat
-		end if
-	end repeat
+	if thePrinter is "PDFWriter" then
+				set ipPrinterFound to true
+	else 
+		set ipPrinterFound to false
+		repeat with currentItem in nameList
+			if currentItem is in dnsString then
+				set ipPrinterFound to true
+				exit repeat
+			end if
+		end repeat
+	end if -- end of PDFWriter text
 	
-	activate
 	if ipPrinterFound is false then
+		activate
 		display dialog "The default printer" & return & return & printerName & return & return & "seems to be offline." buttons {"OK"} with title msgTitle
 	else
 		try
