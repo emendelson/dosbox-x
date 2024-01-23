@@ -10,18 +10,27 @@
 #include <File.au3>
 
 Global $gh
+Global $format
 
 $qt = Chr(34)
 $space = " "
-$t = ""
+$t = "DOSBox-X Printing"
 $mydir = @ScriptDir
+
+$format = "pdf"
+If StringInStr(@ScriptName, "Raw") Then
+	If StringInStr(@ScriptName, "PDF") Then
+		MsgBox(0,$t,"My name can include either PDF or Raw, not both.")
+		Exit
+	EndIf
+	$format = "raw"
+EndIf
 
 Local $cmln = $CmdLine[0] ;Total commandline parameters entered.
 If $cmln = 0 Then    ;If no paramters given
 	MsgBox(0, "DOSBox-X Printing", "Filename required.")
 	Exit
 EndIf
-
 
 If $cmln = 1 Then
 	If FileExists($CmdLine[1]) Then
@@ -37,7 +46,12 @@ $outpdf = $qt & _PathFull($outpdf) & $qt
 ;;;;;;;;;;;;;;;;;;;;
 ; MsgBox(0,'', $outpdf)
 
-$ptrselmsg = "Select a printer for raw printer output"
+If $format = "pdf" Then
+	$ptrselmsg = "Select a printer for this PDF file:"
+Else
+	$ptrselmsg = "Select a printer for raw printer output"
+EndIf
+
 $printername = 0
 GetPrinter($ptrselmsg)
 Do
@@ -49,21 +63,22 @@ If $printername = "nul" Then
 	Exit
 EndIf
 
-; $printexe = "PDFXCview.exe"
-; $printtostring = " " & "/printto: " & $qt & $printername & $qt & " "
-$rawprintexe = "RawPrint.exe"
+If $format = "pdf" Then
+	$printexe = "PDFXCview.exe"
+	$printtostring = " " & "/printto: " & $qt & $printername & $qt & " "
+Else
+	$rawprintexe = "RawPrint.exe"
+EndIf
 
 
 FileChangeDir(@ScriptDir)
 ; If Not @Compiled Then ConsoleWrite($printexe & " " & $printtostring & " " & $outpdf & @CRLF)
 
-; RunWait(@ComSpec & " /c " & $printexe & " " & $printtostring & " " & $outpdf, @ScriptDir, @SW_HIDE)
-
-; MsgBox(0,'', $printername)
-
-RunWait(@ComSpec & " /c " & $rawprintexe & " " & $qt & $printername & $qt & " " & $outpdf, @ScriptDir, @SW_HIDE)
-
-; RunWait(@ComSpec & " /c " & $rawprintexe & " " & $outpdf, @ScriptDir, @SW_HIDE)
+If $format = "pdf" Then
+	RunWait(@ComSpec & " /c " & $printexe & " " & $printtostring & " " & $outpdf, @ScriptDir, @SW_HIDE)
+Else
+	RunWait(@ComSpec & " /c " & $rawprintexe & " " & $qt & $printername & $qt & " " & $outpdf, @ScriptDir, @SW_HIDE)
+EndIf
 
 FileDelete($outpdf)
 
