@@ -1,7 +1,5 @@
 #!/bin/bash
 
-# convert text file to arbitrarily-named PDF on desktop
-
 cd "$(dirname "$0")"
 
 LOC=$( defaults read "Apple Global Domain" AppleLocale )
