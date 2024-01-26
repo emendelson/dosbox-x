@@ -8,3 +8,5 @@ clip.exe < %1
 del %1
 
 exit
+type
+
