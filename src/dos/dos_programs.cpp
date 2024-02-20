@@ -706,7 +706,21 @@ void MenuBrowseImageFile(char drive, bool arc, bool boot, bool multiple) {
 		strcat(mountstring,files.size()?files.c_str():fname.c_str());
         if(!multiple) strcat(mountstring, "\"");
         if(mountiro[drive - 'A']) strcat(mountstring, " -ro");
-        if(boot) strcat(mountstring, " -u");
+        if(boot) {
+            strcat(mountstring, " -u");
+            mountstring[0] = drive - 'A' + '0';
+            runImgmount(mountstring);   // mount by drive number
+            std::string bootstr = "-Q ";
+            bootstr += drive;
+            bootstr += ':';
+            runBoot(bootstr.c_str());
+            std::string drive_warn = "Drive " + std::string(1, drive) + ": failed to boot.";
+            systemmessagebox("Error", drive_warn.c_str(), "ok", "error", 1);
+            bootstr = "-u ";
+            bootstr += drive - 'A' + '0';
+            runImgmount(bootstr.c_str()); // unmount if boot failed
+            return;
+        }
         if(arc) {
             strcat(mountstring," -q");
             runMount(mountstring);
@@ -716,17 +730,11 @@ void MenuBrowseImageFile(char drive, bool arc, bool boot, bool multiple) {
             qmount=false;
         }
 		chdir( Temp_CurrentDir );
-		if (!Drives[drive-'A']) {
+		if (!Drives[drive - 'A']) {
 			drive_warn="Drive "+str+": failed to mount.";
 			systemmessagebox("Error",drive_warn.c_str(),"ok","error", 1);
 			return;
-		} else if (boot) {
-			char str[] = "-Q A:";
-			str[3]=drive;
-			runBoot(str);
-			std::string drive_warn="Drive "+std::string(1, drive)+": failed to boot.";
-			systemmessagebox("Error",drive_warn.c_str(),"ok","error", 1);
-		} else if (multiple) {
+        } else if (multiple) {
 			systemmessagebox("Information",("Mounted disk images to Drive "+std::string(1,drive)+(dos.loaded_codepage==437?":\n"+files:".")+(mountiro[drive-'A']?"\n(Read-only mode)":"")).c_str(),"ok","info", 1);
 		} else if (lTheOpenFileName) {
 			systemmessagebox("Information",(std::string(arc?"Mounted archive":"Mounted disk image")+" to Drive "+std::string(1,drive)+":\n"+std::string(lTheOpenFileName)+(arc||mountiro[drive-'A']?"\n(Read-only mode)":"")).c_str(),"ok","info", 1);
@@ -6426,6 +6434,7 @@ class IMGMOUNT : public Program {
 		}
 
 		imageDisk* MountImageNone(const char* fileName, FILE* file, const Bitu sizesOriginal[], const int reserved_cylinders, bool roflag) {
+			bool assumeHardDisk = false;
 			imageDisk* newImage = 0;
 			Bitu sizes[4];
 			sizes[0] = sizesOriginal[0];
@@ -6453,6 +6462,9 @@ class IMGMOUNT : public Program {
 							default: break;
 						}
 						return newImage;
+					}
+					else if (!strcasecmp(ext, ".hdi")) {
+						assumeHardDisk = true; /* bugfix for HDI images smaller than 2.88MB so that the .hdi file is not mistaken for a floppy disk image */
 					}
 				}
 			}
@@ -6500,35 +6512,35 @@ class IMGMOUNT : public Program {
 					sectors = (uint64_t)ftello64(newDisk) / (uint64_t)sizes[0];
 					imagesize = (uint32_t)(sectors / 2); /* orig. code wants it in KBs */
 					setbuf(newDisk, NULL);
-					newImage = new imageDiskD88(newDisk, fname, imagesize, (imagesize > 2880));
+					newImage = new imageDiskD88(newDisk, fname, imagesize, false/*this is a FLOPPY image format*/);
 				}
 				else if (!memcmp(tmp, "VFD1.", 5)) { /* FDD files */
 					fseeko64(newDisk, 0L, SEEK_END);
 					sectors = (uint64_t)ftello64(newDisk) / (uint64_t)sizes[0];
 					imagesize = (uint32_t)(sectors / 2); /* orig. code wants it in KBs */
 					setbuf(newDisk, NULL);
-					newImage = new imageDiskVFD(newDisk, fname, imagesize, (imagesize > 2880));
+					newImage = new imageDiskVFD(newDisk, fname, imagesize, false/*this is a FLOPPY image format*/);
 				}
 				else if (!memcmp(tmp,"T98FDDIMAGE.R0\0\0",16)) {
 					fseeko64(newDisk, 0L, SEEK_END);
 					sectors = (uint64_t)ftello64(newDisk) / (uint64_t)sizes[0];
 					imagesize = (uint32_t)(sectors / 2); /* orig. code wants it in KBs */
 					setbuf(newDisk, NULL);
-					newImage = new imageDiskNFD(newDisk, fname, imagesize, (imagesize > 2880), 0);
+					newImage = new imageDiskNFD(newDisk, fname, imagesize, false/*this is a FLOPPY image format*/, 0);
 				}
 				else if (!memcmp(tmp,"T98FDDIMAGE.R1\0\0",16)) {
 					fseeko64(newDisk, 0L, SEEK_END);
 					sectors = (uint64_t)ftello64(newDisk) / (uint64_t)sizes[0];
 					imagesize = (uint32_t)(sectors / 2); /* orig. code wants it in KBs */
 					setbuf(newDisk, NULL);
-					newImage = new imageDiskNFD(newDisk, fname, imagesize, (imagesize > 2880), 1);
+					newImage = new imageDiskNFD(newDisk, fname, imagesize, false/*this is a FLOPPY image format*/, 1);
 				}
 				else {
 					fseeko64(newDisk, 0L, SEEK_END);
 					sectors = (uint64_t)ftello64(newDisk) / (uint64_t)sizes[0];
 					imagesize = (uint32_t)(sectors / 2); /* orig. code wants it in KBs */
 					setbuf(newDisk, NULL);
-					newImage = new imageDisk(newDisk, fname, imagesize, (imagesize > 2880));
+					newImage = new imageDisk(newDisk, fname, imagesize, (imagesize > 2880) || assumeHardDisk);
 				}
 			}
 

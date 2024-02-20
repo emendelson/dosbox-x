@@ -149,6 +149,7 @@ unsigned int reset_post_delay = 0;
 Bitu call_irq_default = 0;
 uint16_t biosConfigSeg=0;
 
+Bitu BIOS_PC98_KEYBOARD_TRANSLATION_LOCATION = ~0u;
 Bitu BIOS_DEFAULT_IRQ0_LOCATION = ~0u;       // (RealMake(0xf000,0xfea5))
 Bitu BIOS_DEFAULT_IRQ1_LOCATION = ~0u;       // (RealMake(0xf000,0xe987))
 Bitu BIOS_DEFAULT_IRQ07_DEF_LOCATION = ~0u;  // (RealMake(0xf000,0xff55))
@@ -3518,11 +3519,11 @@ static Bitu INT18_PC98_Handler(void) {
             IO_WriteB(0x43, 0x16);
             for (int i=0; i<0x20; i++) mem_writeb(0x502+i, 0);
             for (int i=0; i<0x13; i++) mem_writeb(0x528+i, 0);
-            mem_writew(0x522, 0x0e00);
+            mem_writew(0x522,(unsigned int)(Real2Phys(BIOS_PC98_KEYBOARD_TRANSLATION_LOCATION) - 0xFD800));
             mem_writew(0x524, 0x0502);
             mem_writew(0x526, 0x0502);
-            mem_writew(0x5c6, 0x0e00);
-            mem_writew(0x5c8, 0xfd80);
+            mem_writew(0x5C6,(unsigned int)(Real2Phys(BIOS_PC98_KEYBOARD_TRANSLATION_LOCATION) - 0xFD800));
+            mem_writew(0x5C8,0xFD80);
             break;
         case 0x04: /* Sense of key input state (キー入力状態のセンス) */
             reg_ah = mem_readb(0x52A + (unsigned int)(reg_al & 0x0Fu));
@@ -3610,7 +3611,18 @@ static Bitu INT18_PC98_Handler(void) {
         //       (Something to do with the buffer [https://ia801305.us.archive.org/8/items/PC9800TechnicalDataBookBIOS1992/PC-9800TechnicalDataBook_BIOS_1992_text.pdf])
         //       Neko Project is also unaware of such a call.
         case 0x0C: /* text layer enable */
-            if (pc98_gdc_vramop & (1u << VOPBIT_VGA)) {
+	    /* PROBLEM: Okay, so it's unclear when text layer is or is not allowed.
+             *          I was unable to turn on the text layer with this BIOS call on real PC-9821 hardware, so I believed that it did not allow it.
+             *
+             *          But PC-9821 CD-ROM game "Shamat, The Holy Circlet" expects to turn on the text layer in 640x400 256-color PEGC mode,
+             *          because it displays graphics in the background while scrolling Japanese text up over it, and if sound hardware is available,
+             *          plays a voice reading the text synchronized to it.
+             *
+             *          Perhaps in my case it was 640x480 256-color mode, not 640x400 256-color mode, but then, 640x480 also enables a text mode with
+             *          either more rows or a taller character cell which is apparently recognized by the MS-DOS console driver.
+             *
+             *          So then, what exactly decides whether or not to allow this call to enable the text layer? */
+            if (pc98_gdc_vramop & (1u << VOPBIT_VGA) && 0/*DISABLED*/) {
                /* NTS: According to tests on real PC-9821 hardware, you can't turn on the text layer in 256-color mode, at least through the BIOS. */
                /* FIXME: Is this a restriction imposed by the BIOS, or the hardware itself? */
                LOG_MSG("INT 18h: Attempt to turn on text layer in 256-color mode");
@@ -7940,6 +7952,7 @@ extern uint32_t tandy_128kbase;
 
 static int bios_post_counter = 0;
 
+extern void BIOSKEY_PC98_Write_Tables(void);
 extern Bitu PC98_AVSDRV_PCM_Handler(void);
 
 class BIOS:public Module_base{
@@ -8208,6 +8221,11 @@ private:
              *
              *       NOTED: Neko Project II determines INT 18h AH=30h availability by whether or not it was compiled
              *              with 31khz hsync support (SUPPORT_CRT31KHZ) */
+
+            /* Set up the translation table poiner, which is relative to segment 0xFD80 */
+            mem_writew(0x522,(unsigned int)(Real2Phys(BIOS_PC98_KEYBOARD_TRANSLATION_LOCATION) - 0xFD800));
+            mem_writew(0x5C6,(unsigned int)(Real2Phys(BIOS_PC98_KEYBOARD_TRANSLATION_LOCATION) - 0xFD800));
+            mem_writew(0x5C8,0xFD80);
         }
 
         if (bios_user_reset_vector_blob != 0 && !bios_user_reset_vector_blob_run) {
@@ -9974,13 +9992,20 @@ public:
             {
                 std::string s = section->Get_string("isa memory hole at 15mb");
 
-                if (s == "true" || s == "1")
+                // Do NOT emulate the memory hole if emulating 24 or less address bits! BIOS crashes will result at startup!
+                // The whole point of the 15MB memory hole is to emulate a hole into hardware as if a 24-bit 386SX. A memalias
+                // setting of 24 makes it redundant. Furthermore memalias=24 and 15MB memory hole prevents the BIOS from
+                // mapping correctly and crashes immediately at startup. This is especially necessary for PC-98 mode where
+		// memalias==24 and memory hole enabled for the PEGC linear framebuffer prevents booting.
+
+                if (MEM_get_address_bits() <= 24)
+                    isa_memory_hole_15mb = false;
+                else if (s == "true" || s == "1")
                     isa_memory_hole_15mb = true;
                 else if (s == "false" || s == "0")
                     isa_memory_hole_15mb = false;
                 else if (IS_PC98_ARCH)
-                    isa_memory_hole_15mb = true;
- // For the sake of some DOS games, enable by default
+                    isa_memory_hole_15mb = true; // For the sake of some PC-98 DOS games, enable by default
                 else
                     isa_memory_hole_15mb = false;
             }
@@ -10008,6 +10033,13 @@ public:
             }
         }
 
+	if (IS_PC98_ARCH) {
+		/* Keyboard translation tables, must exist at segment 0xFD80:0x0E00 because PC-98 MS-DOS assumes it (it writes 0x522 itself on boot) */
+		/* The table must be placed back far enough so that (0x60 * 10) bytes do not overlap the lookup table at 0xE28 */
+		BIOS_PC98_KEYBOARD_TRANSLATION_LOCATION = PhysToReal416(ROMBIOS_GetMemory(0x60 * 10,"Keyboard translation tables",/*align*/1,0xFD800+0xA13));
+		if (ROMBIOS_GetMemory(0x2 * 10,"Keyboard translation shift tables",/*align*/1,0xFD800+0xE28) == (~0u)) E_Exit("Failed to allocate shift tables");//reserve it
+		BIOSKEY_PC98_Write_Tables();
+	}
 
         /* pick locations */
 	/* IBM PC mode: See [https://github.com/skiselev/8088_bios/blob/master/bios.asm]. Some values also provided by Allofich.
@@ -10365,6 +10397,33 @@ public:
                 bo = 0xE8000;
                 phys_writeb(bo+0x00,(uint8_t)0xEB);                       // JMP $+2 (to next instruction)
                 phys_writeb(bo+0x01,(uint8_t)0x00);
+
+                /* "Nut Berry" expects a 8-byte lookup table for [AL&7] -> 1 << (AL&7) at 0xFD80:0x0E3C so it's
+                 * custom keyboard interrupt handler can update the keyboard status bitmap in the BIOS data area.
+                 * I don't know if the game even uses it. On a BIOS.ROM image I have, and on real hardware, there
+                 * is clearly that table but at slightly different addresses (One PC-9821 laptop has it at
+                 * 0xFD80:0x0E45) which means whether the game uses it or not the bitmap may have random bits set
+                 * when you exit to DOS.
+                 *
+                 * Assuming no other game does this, this fixed address should be fine.
+                 *
+                 * NOTE: After disassembling the IRQ1 handler on a real PC-9821 laptop, I noticed this game's
+                 *       custom ISR bears a strong resemblance to it. In fact, you might say it's an exact instruction
+                 *       for instruction copy of the ISR, except that the table addresses in ROM are slightly different.
+                 *       Ha. Theoretically then, that means we could also get this game to work fully properly by patching
+                 *       it not to hook the keyboard interrupt at all! */
+                for (unsigned int i=0;i < 8;i++) phys_writeb(0xFD800+0xE3C+i,1u << i);
+
+                /* "Nut Berry" also assumes shift state table offsets (for all 16 possible combinations) exist
+                 * at 0xFD80:0x0E28. Once again, this means it will not work properly on anything other than the dev's
+                 * machine because on a real PC-9821 laptop used for testing, the table offset is slightly different
+                 * (0xE31 instead of 0xE28). The table mentioned here is used to update the 0x522 offset WORD in the
+                 * BIOS data area to reflect the translation table in effect based on the shift key status, so if you
+                 * misread the table you end up pointing it at junk and then keyboard input doesn't work anymore. */
+                // NTS: On a real PC-9821 laptop, the table is apparently 10 entries long. If BDA byte 0x53A is less than
+                //      8 then it's just a simple lookup. If BDA byte 0x53A has bit 4 set, then use the 8th entry, and
+                //      if bit 4 and 3 are set, use the 9th entry.
+                for (unsigned int i=0;i < 10;i++) phys_writew(0xFD800+0xE28+(i*2),(unsigned int)(Real2Phys(BIOS_PC98_KEYBOARD_TRANSLATION_LOCATION) - 0xFD800) + (i * 0x60));
             }
 	    else {
 		    if (ibm_rom_basic_size == 0) {
