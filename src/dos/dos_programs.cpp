@@ -594,8 +594,8 @@ void MenuBrowseFDImage(char drive, int num, int type) {
     getcwd(Temp_CurrentDir, 512);
     char const * lTheOpenFileName;
     std::string files="", fname="";
-    const char *lFilterPatterns[] = {"*.ima","*.img","*.fdi","*.nfd","*.d88","*.IMA","*.IMG","*.FDI", "*.NFD", "*.D88"};
-    const char *lFilterDescription = "Floppy image files (*.ima, *.img, *.fdi, *.nfd, *.d88)";
+    const char *lFilterPatterns[] = {"*.ima","*.img","*.xdf","*.fdi","*.hdm","*.nfd","*.d88","*.IMA","*.IMG","*.XDF","*.FDI","*.HDM","*.NFD","*.D88"};
+    const char *lFilterDescription = "Floppy image files (*.ima, *.img, *.xdf, *.fdi, *.hdm, *.nfd, *.d88)";
     lTheOpenFileName = tinyfd_openFileDialog("Select a floppy image file","",4,lFilterPatterns,lFilterDescription,0);
 
     if (lTheOpenFileName) {
@@ -656,8 +656,8 @@ void MenuBrowseImageFile(char drive, bool arc, bool boot, bool multiple) {
         lTheOpenFileName = tinyfd_openFileDialog(("Select an archive file for Drive "+str+":").c_str(),"",4,lFilterPatterns,lFilterDescription,0);
         if (lTheOpenFileName) fname = GetNewStr(lTheOpenFileName);
     } else {
-        const char *lFilterPatterns[] = {"*.ima","*.img","*.vhd","*.fdi","*.hdi","*.nfd","*.nhd","*.d88","*.hdm","*.iso","*.cue","*.bin","*.chd","*.mdf","*.gog","*.ins","*.IMA","*.IMG","*.VHD","*.FDI","*.HDI","*.NFD","*.NHD","*.D88","*.HDM","*.ISO","*.CUE","*.BIN","*.CHD","*.MDF","*.GOG","*.INS"};
-        const char *lFilterDescription = "Disk/CD image files (*.ima, *.img, *.vhd, *.fdi, *.hdi, *.nfd, *.nhd, *.d88, *.hdm, *.iso, *.cue, *.bin, *.chd, *.mdf, *.gog, *.ins)";
+        const char *lFilterPatterns[] = {"*.ima","*.img","*.vhd","*.fdi","*.hdi","*.nfd","*.nhd","*.d88","*.hdm","*.xdf","*.iso","*.cue","*.bin","*.chd","*.mdf","*.gog","*.ins","*.IMA","*.IMG","*.VHD","*.FDI","*.HDI","*.NFD","*.NHD","*.D88","*.HDM","*.XDF","*.ISO","*.CUE","*.BIN","*.CHD","*.MDF","*.GOG","*.INS"};
+        const char *lFilterDescription = "Disk/CD image files";
         lTheOpenFileName = tinyfd_openFileDialog(((multiple?"Select image file(s) for Drive ":"Select an image file for Drive ")+str+":").c_str(),"",22,lFilterPatterns,lFilterDescription,multiple?1:0);
         if (lTheOpenFileName) fname = GetNewStr(lTheOpenFileName);
         if (multiple&&fname.size()) {
@@ -1685,7 +1685,7 @@ bool MEM_map_ROM_physmem(Bitu start,Bitu end);
 PageHandler &Get_ROM_page_handler(void);
 
 // Normal BIOS is in the BIOS memory area
-// ITF is in it's own buffer, served by mem_itf_rom
+// ITF is in its own buffer, served by mem_itf_rom
 void PC98_BIOS_Bank_Switch(void) {
     if (PC98_BANK_Select == 0x00) {
         MEM_RegisterHandler(0xF8,&mem_itf_rom,0x8);
@@ -2557,7 +2557,7 @@ public:
             extern const char* RunningProgram;
 
             if (max_seg < 0x0800) {
-                /* TODO: For the adventerous, add a configuration option or command line switch to "BOOT"
+                /* TODO: For the adventurous, add a configuration option or command line switch to "BOOT"
                  *       that allows us to boot the guest OS anyway in a manner that is non-standard. */
                 if (!quiet) WriteOut("32KB of RAM is required to boot a guest OS\n");
                 return;
@@ -5428,6 +5428,11 @@ class IMGMOUNT : public Program {
 					}
 					else break;
 				}
+				if (commandLine == "empty") {
+					/* special name */
+					paths.push_back(commandLine);
+					continue;
+				}
 #if defined (WIN32) || defined(OS2)
 				// Windows: Workaround for LaunchBox
 				if (commandLine.size()>4 && commandLine[0]=='\'' && toupper(commandLine[1])>='A' && toupper(commandLine[1])<='Z' && commandLine[2]==':' && (commandLine[3]=='/' || commandLine[3]=='\\') && commandLine.back()=='\'')
@@ -5889,13 +5894,15 @@ class IMGMOUNT : public Program {
 				bool ro=false;
 
 				//detect hard drive geometry
-				if (imgsizedetect) {
+				if (paths[i] == "empty") {
+					errorMessage = "empty file not supported for drive letter mount\n";
+				}
+				else if (imgsizedetect) {
 					bool skipDetectGeometry = false;
 					sizes[0] = 0;
 					sizes[1] = 0;
 					sizes[2] = 0;
 					sizes[3] = 0;
-
 
 					/* .HDI images contain the geometry explicitly in the header. */
 					if (str_size.size() == 0) {
@@ -5987,14 +5994,14 @@ class IMGMOUNT : public Program {
 									newImage = NULL;
 								}
 							}
-                            else if (!strcasecmp(ext,".img") || !strcasecmp(ext,".ima")){ // Raw MFM image format is typically .img or .ima
-                                unsupported_ext = false;
-                            }
-                            else {
-                                LOG_MSG("IMGMOUNT: Perhaps unsupported extension %s", ext);
-                                unsupported_ext = true;
-                                path_no = i;
-                            }
+							else if (!strcasecmp(ext,".img") || !strcasecmp(ext,".ima")){ // Raw MFM image format is typically .img or .ima
+								unsupported_ext = false;
+							}
+							else {
+								LOG_MSG("IMGMOUNT: Perhaps unsupported extension %s", ext);
+								unsupported_ext = true;
+								path_no = i;
+							}
 						}
 					}
 					if (!skipDetectGeometry && !DetectGeometry(NULL, paths[i].c_str(), sizes)) {
@@ -6016,7 +6023,7 @@ class IMGMOUNT : public Program {
 						strcat(newDrive->info, ro ? paths[i].c_str() + 1 : paths[i].c_str());
 						LOG_MSG("IMGMOUNT: qcow2 image mounted (experimental)");
 						LOG_MSG("IMGMOUNT: qcow2 SS,S,H,C: %u,%u,%u,%u",
-								(uint32_t)newImage->sector_size, (uint32_t)newImage->sectors, (uint32_t)newImage->heads, (uint32_t)newImage->cylinders);
+							(uint32_t)newImage->sector_size, (uint32_t)newImage->sectors, (uint32_t)newImage->heads, (uint32_t)newImage->cylinders);
 						newImage = NULL;
 					}
 					else {
@@ -6036,7 +6043,7 @@ class IMGMOUNT : public Program {
 						diskfiles[i]=fdrive->loadedDisk->diskimg;
 						if ((vhdImage&&ro)||roflag) fdrive->readonly=true;
 					}
-                    unformatted = fdrive->unformatted;
+					unformatted = fdrive->unformatted;
 				}
 				if (errorMessage) {
 					if (!qmount) WriteOut(errorMessage);
@@ -6056,17 +6063,17 @@ class IMGMOUNT : public Program {
 			}
 			lastmount = drive;
 			if (!qmount) WriteOut(MSG_Get("PROGRAM_MOUNT_STATUS_2"), drive, tmp.c_str());
-            if (unformatted) {
-                if(!qmount) WriteOut(MSG_Get("PROGRAM_MOUNT_NOT_FORMATTED"));
-                LOG_MSG("IMGMOUNT: Drive %c not formatted", drive);
-            }
-            if (unsupported_ext) {
-                const char *ext = strrchr(paths[path_no].c_str(), '.');
-                if (ext != NULL) {
-                    if(!qmount) WriteOut(MSG_Get("PROGRAM_MOUNT_UNSUPPORTED_EXT"), ext);
-                    LOG_MSG("Unsupported extension %s: Mounted as raw IMG image.", ext);
-                }
-            }
+			if (unformatted) {
+				if(!qmount) WriteOut(MSG_Get("PROGRAM_MOUNT_NOT_FORMATTED"));
+				LOG_MSG("IMGMOUNT: Drive %c not formatted", drive);
+			}
+			if (unsupported_ext) {
+				const char *ext = strrchr(paths[path_no].c_str(), '.');
+				if (ext != NULL) {
+					if(!qmount) WriteOut(MSG_Get("PROGRAM_MOUNT_UNSUPPORTED_EXT"), ext);
+					LOG_MSG("Unsupported extension %s: Mounted as raw IMG image.", ext);
+				}
+			}
 			unsigned char driveIndex = drive-'A';
 			if (imgDisks.size() == 1 || (imgDisks.size() > 1 && driveIndex < 2 && (swapInDisksSpecificDrive == driveIndex || swapInDisksSpecificDrive == -1))) {
 				imageDisk* image = ((fatDrive*)imgDisks[0])->loadedDisk;
@@ -6437,12 +6444,17 @@ class IMGMOUNT : public Program {
 
 			// Print status message (success)
 			if (!qmount) WriteOut(MSG_Get("MSCDEX_SUCCESS"));
-			std::string tmp(wpcolon&&paths[0].length()>1&&paths[0].c_str()[0]==':'?paths[0].substr(1):paths[0]);
-			for (i = 1; i < paths.size(); i++) {
-				tmp += "; " + (wpcolon&&paths[i].length()>1&&paths[i].c_str()[0]==':'?paths[i].substr(1):paths[i]);
+			if (!paths.empty()) {
+				std::string tmp(wpcolon&&paths[0].length()>1&&paths[0].c_str()[0]==':'?paths[0].substr(1):paths[0]);
+				for (i = 1; i < paths.size(); i++) {
+					tmp += "; " + (wpcolon&&paths[i].length()>1&&paths[i].c_str()[0]==':'?paths[i].substr(1):paths[i]);
+				}
+				lastmount = drive;
+				if (!qmount) WriteOut(MSG_Get("PROGRAM_MOUNT_STATUS_2"), drive, tmp.c_str());
 			}
-			lastmount = drive;
-			if (!qmount) WriteOut(MSG_Get("PROGRAM_MOUNT_STATUS_2"), drive, tmp.c_str());
+			else {
+				lastmount = drive;
+			}
 			return true;
 		}
 
@@ -6454,6 +6466,20 @@ class IMGMOUNT : public Program {
 			sizes[1] = sizesOriginal[1];
 			sizes[2] = sizesOriginal[2];
 			sizes[3] = sizesOriginal[3];
+
+			if (!strcmp(fileName,"empty")) {
+				imageDiskEmptyDrive *emd = new imageDiskEmptyDrive();
+				if (sizes[0] != 0 && sizes[1] != 0 && sizes[2] != 0 && sizes[3] != 0) {
+					emd->sector_size = sizes[0];
+					emd->sectors = sizes[1];
+					emd->heads = sizes[2];
+					emd->cylinders = sizes[3];
+					emd->diskSizeK = ((sizes[0]*sizes[1]*sizes[2]*sizes[3])+512)/1024;
+					emd->UpdateFloppyType();
+				}
+				LOG_MSG("Mounted empty C/H/S/sz %u/%u/%u/%u %uKB",emd->cylinders,emd->heads,emd->sectors,emd->sector_size,emd->diskSizeK);
+				return emd;
+			}
 
 			//check for VHD files
 			if (sizes[0] == 0 /* auto detect size */) {
@@ -6581,7 +6607,7 @@ class IMGMOUNT : public Program {
 				sizes[3]/*cylinders*/ = (Bitu)((uint64_t)sectors / (uint64_t)sizes[2]/*heads*/ / (uint64_t)sizes[1]/*sectors/track*/);
 
 				if (IS_PC98_ARCH) {
-					/* TODO: PC-98 has it's own issues with a 4096-cylinder limit */
+					/* TODO: PC-98 has its own issues with a 4096-cylinder limit */
 				}
 				else {
 					/* INT 13h mapping, deal with 1024-cyl limit */
@@ -9280,7 +9306,6 @@ void DOS_SetupPrograms(void) {
         "\033[32;1mInformation:\033[0m\n\n"
         "For information about basic mount, type \033[34;1mintro mount\033[0m\n"
         "For information about CD-ROM support, type \033[34;1mintro cdrom\033[0m\n"
-        "For information about special keys, type \033[34;1mintro special\033[0m\n"
         "For information about usage, type \033[34;1mintro usage\033[0m\n\n"
         "For the latest version of DOSBox-X, go to its homepage:\033[34;1m\n"
         "\n"

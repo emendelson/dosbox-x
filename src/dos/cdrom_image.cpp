@@ -470,6 +470,7 @@ CDROM_Interface_Image::imagePlayer CDROM_Interface_Image::player;
 CDROM_Interface_Image::CDROM_Interface_Image(uint8_t subUnit)
 		      :subUnit(subUnit)
 {
+	class_id = ID_IMAGE;
 	images[subUnit] = this;
 	if (refCount == 0) {
 		if (player.channel == NULL) {
@@ -1153,7 +1154,7 @@ bool CDROM_Interface_Image::LoadCloneCDSheet(char *cuefile) {
 			currentSection = std::string(base,(size_t)(s-base));
 
 			if (mode == ENTRY) {
-				LOG_MSG("Entry point %02x\n",entry.Point);
+//				LOG_MSG("Entry point %02x\n",entry.Point);
 				if (entry.Point == 0xA2) leadOutLBA = entry.PLBA;
 				else if (entry.Point > 0 && entry.Point <= TocEntries) {
 					CloneCDEntryToTrack(track,entry);
