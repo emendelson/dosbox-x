@@ -25,6 +25,7 @@ dosbox-x.app: $(MACOS_BINARIES) contrib/macos/dosbox.icns src/tool/mach-o-matic
 	mkdir dosbox-x.app/Contents/Resources/glshaders
 	mkdir dosbox-x.app/Contents/Resources/languages
 	cp -v contrib/macos/dosbox-x.plist dosbox-x.app/Contents/Info.plist
+	cp -v contrib/macos/Credits.rtf dosbox-x.app/Contents/Resources/Credits.rtf
 	cp -v contrib/macos/dosbox-x.pkginfo dosbox-x.app/Contents/PkgInfo
 	cp -v contrib/macos/dosbox.icns dosbox-x.app/Contents/Resources/dosbox-x.icns
 	cp -v contrib/macos/gs dosbox-x.app/Contents/Resources/gs  #emendelson
