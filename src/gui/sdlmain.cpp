@@ -5486,6 +5486,26 @@ void GFX_Events() {
                             decreaseFontSize();
                             break;
 #endif
+
+                            // emendelson sysmenu start
+                        case ID_WIN_SYSMENU_PRINTHELP:
+
+                            ::MessageBoxA(HWND(), (
+                                "Printing with DOSBox-X-Print\r"
+                                "\r"
+                                "LPT1 : print to the default Windows printer (via PDF)\r"
+                                "LPT2 : opens temporary PDF in default viewer\r"
+                                "LPT3 : create PDF on desktop\r"
+                                "LPT4 : print raw output to default Windows printer\r"
+                                "LPT5 : prints raw output to printer selected from popup\r"
+                                "LPT6 : prints (via PDF) to printer selected from popup\r"
+                                "LPT7 : disabled\r"
+                                "LPT8 : prints text to the Windows clipboard\r"
+                                ),
+                                "DOSBox-X-Print printing", MB_OK);
+                            break;
+                            // emendelson sysmenu end
+
                         default:
                             break;
                     }
@@ -5940,6 +5960,26 @@ void GFX_Events() {
                             decreaseFontSize();
                             break;
 #endif
+
+                            // emendelson sysmenu start
+                        case ID_WIN_SYSMENU_PRINTHELP:
+
+                            ::MessageBoxA(HWND(), (
+                                "Printing with DOSBox-X-Print\r"
+                                "\r"
+                                "LPT1 : print to the default Windows printer (via PDF)\r"
+                                "LPT2 : opens temporary PDF in default viewer\r"
+                                "LPT3 : create PDF on desktop\r"
+                                "LPT4 : print raw output to default Windows printer\r"
+                                "LPT5 : prints raw output to printer selected from popup\r"
+                                "LPT6 : prints (via PDF) to printer selected from popup\r"
+                                "LPT7 : disabled\r"
+                                "LPT8 : prints text to the Windows clipboard\r"
+                                ),
+                                "DOSBox-X-Print printing", MB_OK);
+                            break;
+                            // emendelson sysmenu end
+
 #endif
                     }
                 default:
