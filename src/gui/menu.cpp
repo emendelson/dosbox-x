@@ -349,6 +349,15 @@ static const char *def_menu_video_frameskip[] =
     NULL
 };
 
+/* video prevent capture menu ("VideoPreventCaptureMenu") */
+static const char *def_menu_video_preventcapture[] =
+{
+    "prevcap_none",
+    "prevcap_blank",
+    "prevcap_invisible",
+    NULL
+};
+
 /* video scaler menu ("VideoRatioMenu") */
 static const char *def_menu_video_ratio[] =
 {
@@ -511,6 +520,9 @@ static const char *def_menu_video_pc98[] =
 /* video menu ("VideoMenu") */
 static const char *def_menu_video[] =
 {
+#if defined(WIN32) || defined(MACOSX)
+    "VideoPreventCaptureMenu",
+#endif
     "VideoRatioMenu",
     "mapper_aspratio",
 #if !defined(C_SDL2) && defined(MACOSX)
@@ -1235,7 +1247,7 @@ bool DOSBoxMenu::nsMenuInit(void) {
             item.nsAppendMenu(nsMenu);
         }
 
-        /* release our handle on the nsMenus. Mac OS X will keep them alive with it's
+        /* release our handle on the nsMenus. Mac OS X will keep them alive with its
            reference until the menu is destroyed at which point all items and submenus
            will be automatically destroyed */
         for (auto &id : master_list) {
@@ -1600,6 +1612,11 @@ void ConstructMenu(void) {
     /* video ratio menu */
     ConstructSubMenu(mainMenu.get_item("VideoRatioMenu").get_master_id(), def_menu_video_ratio);
 
+#if defined(WIN32) || defined(MACOSX)
+    /* video prevent capture menu */
+    ConstructSubMenu(mainMenu.get_item("VideoPreventCaptureMenu").get_master_id(), def_menu_video_preventcapture);
+#endif
+
     /* video frameskip menu */
     ConstructSubMenu(mainMenu.get_item("VideoFrameskipMenu").get_master_id(), def_menu_video_frameskip);
 
@@ -1805,7 +1822,7 @@ std::string MSCDEX_Output(int num) {
     case 4: return MSCDEX_MSG + MSCDEX_MSG_Failure + "Too many CDRom-drives (max: 5). MSCDEX Installation failed";
     case 5: return MSCDEX_MSG + "Mounted subdirectory: limited support.";
     case 6: return MSCDEX_MSG + MSCDEX_MSG_Failure + "Unknown error";
-    default: return 0;
+    default: return {};
     }
 }
 

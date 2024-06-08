@@ -509,7 +509,20 @@ bool CDROM_Interface_Image::SetDevice(char* path, int forceCD)
 		uint16_t size = (uint16_t)strlen(buf);
 		DOS_WriteFile(STDOUT, (uint8_t*)buf, &size);
 	}
-	return result;
+
+    int datatracks=0, audiotracks=0;
+    for(const auto& track : tracks) {
+        if(track.attr == 0x40) {
+            datatracks++;
+        }
+        else if(track.attr == 0) {
+            audiotracks++;
+        }
+    }
+    LOG_MSG("CDROM: Image loaded No. of data tracks=%d, audio tracks=%d",
+        datatracks, audiotracks-1
+        );
+    return result;
 }
 
 bool CDROM_Interface_Image::GetUPC(unsigned char& attr, char* upc)
@@ -525,14 +538,15 @@ bool CDROM_Interface_Image::GetAudioTracks(int& stTrack, int& end, TMSF& leadOut
 	end = (int)(tracks.size() - 1);
 	FRAMES_TO_MSF(tracks[tracks.size() - 1].start + 150, &leadOut.min, &leadOut.sec, &leadOut.fr);
 
-	//#ifdef DEBUG
-	LOG_MSG("CDROM: GetAudioTracks, stTrack=%d, end=%d, leadOut.min=%d, leadOut.sec=%d, leadOut.fr=%d",
-	  stTrack,
-	  end,
+	#ifdef DEBUG
+	LOG_MSG("%s CDROM: GetAudioTracks, stTrack=%d, end=%d, leadOut.min=%d, leadOut.sec=%d, leadOut.fr=%d",
+      get_time(),
+      stTrack,
+      end,
 	  leadOut.min,
 	  leadOut.sec,
 	  leadOut.fr);
-	//#endif
+	#endif
 
 	return true;
 }
@@ -1111,14 +1125,13 @@ bool CDROM_Interface_Image::LoadCloneCDSheet(char *cuefile) {
 	long leadOutLBA = -1;
 	ImageCCDEntry entry;
 	tracks.clear();
-	bool success;
 	int mode=NONE;
 	int shift = 0;
 	int currPregap = 0;
 	int totalPregap = 0;
 	int prestart = -1;
 	int Version=0;
-	int Sessions=0;
+	//int Sessions=0;
 	int TocEntries=0;
 	bool isCloneCD=false;
 	int currentEntry = -1;
@@ -1210,8 +1223,10 @@ bool CDROM_Interface_Image::LoadCloneCDSheet(char *cuefile) {
 				case DISC:
 					if (name == "TocEntries")
 						TocEntries = strtol(value.c_str(),NULL,0);
+					#if 0
 					else if (name == "Sessions")
 						Sessions = strtol(value.c_str(),NULL,0);
+					#endif
 					break;
 				case ENTRY:
 					if (name == "Session")
@@ -1285,12 +1300,13 @@ bool CDROM_Interface_Image::LoadCloneCDSheet(char *cuefile) {
 
 bool CDROM_Interface_Image::LoadCueSheet(char *cuefile)
 {
-	// If we're going to support CUE vs CCD vs anything else then this function must
-	// reject any file who's file extension is not .CUE
+	// reject any file which are not a CUE sheet, GOG is so smart that they set several different extensions so that we can't assume .cue only.
+    // Known extensions at the moment are: .cue, .ins, .dat, .inst (not sure it is an exhaustive list)
 	{
 		char *s = strrchr(cuefile,'.');
 		if (!s) return false;
-		if (strcasecmp(s,".cue")) return false;
+		if (!strcasecmp(s,".ccd") || !strcasecmp(s, ".chd") || !strcasecmp(s, ".iso") || !strcasecmp(s, ".img")
+            || !strcasecmp(s, ".mds") || !strcasecmp(s, ".mdf") || !strcasecmp(s, ".bin")) return false;
 	}
 
 	Track track = {0, 0, 0, 0, 0, 0, 0, false, NULL};

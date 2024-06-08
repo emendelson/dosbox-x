@@ -515,7 +515,7 @@ std::vector<CDebugVar*> CDebugVar::varList;
 bool mustCompleteInstruction = false;
 bool skipFirstInstruction = false;
 
-enum EBreakpoint { BKPNT_UNKNOWN, BKPNT_PHYSICAL, BKPNT_INTERRUPT, BKPNT_MEMORY, BKPNT_MEMORY_PROT, BKPNT_MEMORY_LINEAR };
+enum EBreakpoint { BKPNT_UNKNOWN, BKPNT_PHYSICAL, BKPNT_INTERRUPT, BKPNT_MEMORY, BKPNT_MEMORY_PROT, BKPNT_MEMORY_LINEAR, BKPNT_MEMORY_FREEZE };
 
 #define BPINT_ALL 0x100
 
@@ -619,7 +619,7 @@ void CBreakpoint::Activate(bool _active)
 					DEBUG_ShowMsg("DEBUG: Internal error while deactivating breakpoint.\n");
 
 				// Check if we are the last active breakpoint at this location
-				bool otherActive = (FindOtherActiveBreakpoint(location, this) != 0);
+				bool otherActive = (FindOtherActiveBreakpoint(location, this) != nullptr);
 
 				// If so, remove 0xCC and set old value
 				if (!otherActive)
@@ -723,7 +723,7 @@ bool CBreakpoint::CheckBreakpoint(uint16_t seg, uint32_t off)
 #if C_HEAVY_DEBUG
 		// Memory breakpoint support
 		else if (bp->IsActive()) {
-			if ((bp->GetType()==BKPNT_MEMORY) || (bp->GetType()==BKPNT_MEMORY_PROT) || (bp->GetType()==BKPNT_MEMORY_LINEAR)) {
+			if ((bp->GetType()==BKPNT_MEMORY) || (bp->GetType()==BKPNT_MEMORY_PROT) || (bp->GetType()==BKPNT_MEMORY_LINEAR) || (bp->GetType()==BKPNT_MEMORY_FREEZE)) {
 				// Watch Protected Mode Memoryonly in pmode
 				if (bp->GetType()==BKPNT_MEMORY_PROT) {
 					// Check if pmode is active
@@ -741,6 +741,10 @@ bool CBreakpoint::CheckBreakpoint(uint16_t seg, uint32_t off)
 				if (mem_readb_checked((PhysPt)address,&value)) return false;
 				if (bp->GetValue() != value) {
 					// Yup, memory value changed
+                    if (bp->GetType()==BKPNT_MEMORY_FREEZE){
+                        mem_writeb_checked((PhysPt)address,bp->GetValue());
+                        return false;
+                    }
 					DEBUG_ShowMsg("DEBUG: Memory breakpoint %s: %04X:%04X - %02X -> %02X\n",(bp->GetType()==BKPNT_MEMORY_PROT)?"(Prot)":"",bp->GetSegment(),bp->GetOffset(),bp->GetValue(),value);
 					bp->SetValue(value);
 					return true;
@@ -814,7 +818,7 @@ bool CBreakpoint::DeleteByIndex(uint16_t index)
 
 CBreakpoint* CBreakpoint::FindPhysBreakpoint(uint16_t seg, uint32_t off, bool once)
 {
-	if (BPoints.empty()) return 0;
+	if (BPoints.empty()) return nullptr;
 #if !C_HEAVY_DEBUG
 	PhysPt adr = GetAddress(seg, off);
 #endif
@@ -835,7 +839,7 @@ CBreakpoint* CBreakpoint::FindPhysBreakpoint(uint16_t seg, uint32_t off, bool on
 			return bp;
 	}
 
-	return 0;
+	return nullptr;
 }
 
 CBreakpoint* CBreakpoint::FindOtherActiveBreakpoint(PhysPt adr, CBreakpoint* skip)
@@ -846,13 +850,13 @@ CBreakpoint* CBreakpoint::FindOtherActiveBreakpoint(PhysPt adr, CBreakpoint* ski
 		if (bp != skip && bp->GetType() == BKPNT_PHYSICAL && bp->GetLocation() == adr && bp->IsActive())
 			return bp;
 	}
-	return 0;
+	return nullptr;
 }
 
 // is there a permanent breakpoint at address ?
 bool CBreakpoint::IsBreakpoint(uint16_t seg, uint32_t off)
 {
-	return FindPhysBreakpoint(seg, off, false) != 0;
+	return FindPhysBreakpoint(seg, off, false) != nullptr;
 }
 
 bool CBreakpoint::DeleteBreakpoint(uint16_t seg, uint32_t off)
@@ -887,6 +891,8 @@ void CBreakpoint::ShowList(void)
 			DEBUG_ShowMsg("%02X. BPPM %04X:%08X (%02X)\n",nr,bp->GetSegment(),bp->GetOffset(),bp->GetValue());
 		} else if (bp->GetType()==BKPNT_MEMORY_LINEAR ) {
 			DEBUG_ShowMsg("%02X. BPLM %08X (%02X)\n",nr,bp->GetOffset(),bp->GetValue());
+        } else if (bp->GetType()==BKPNT_MEMORY_FREEZE ) {
+	        DEBUG_ShowMsg("%02X. FM %08X (%02X)\n",nr,bp->GetOffset(),bp->GetValue());
 		}
 		nr++;
 	}
@@ -1110,6 +1116,8 @@ void DrawRegistersUpdateOld(void) {
 	oldcpucpl=cpu.cpl;
 }
 
+bool CPU_IsHLTed(void);
+
 static void DrawRegisters(void) {
 	if (dbg.win_main == NULL || dbg.win_reg == NULL)
 		return;
@@ -1185,7 +1193,7 @@ static void DrawRegisters(void) {
 	} else {
 		mvwprintw(dbg.win_reg,0,76,"Real");
 		mvwprintw(dbg.win_reg,2,62,"NOPG");
-    }
+	}
 
 	// Selector info, if available
 	if ((cpu.pmode) && curSelectorName[0]) {
@@ -1196,7 +1204,13 @@ static void DrawRegisters(void) {
 	}
 
 	wattrset(dbg.win_reg,0);
-	mvwprintw(dbg.win_reg,3,60,"%u       ",cycle_count);
+
+	mvwprintw(dbg.win_reg,3,60,"cc=%-8u ",cycle_count);
+	if (CPU_IsHLTed()) mvwprintw(dbg.win_reg,3,73,"HLT ");
+	else mvwprintw(dbg.win_reg,3,73,"RUN ");
+
+	mvwprintw(dbg.win_reg,4,60,"pfi=%-6.9f ",(double)PIC_FullIndex());
+
 	wrefresh(dbg.win_reg);
 }
 
@@ -2184,6 +2198,21 @@ bool ParseCommand(char* str) {
 		DEBUG_ShowMsg("-------------------------------------------------------------------------\n");
 		CBreakpoint::ShowList();
         DEBUG_EndPagedContent();
+		return true;
+	}
+    
+    if (command == "FM") { // Freeze memory value at address
+		uint16_t seg = (uint16_t)GetHexValue(found,found);found++; // skip ":"
+		uint32_t ofs = GetHexValue(found,found);
+        uint8_t value;
+		CBreakpoint* bp = CBreakpoint::AddMemBreakpoint(seg,ofs);
+        Bitu address = (Bitu)GetAddress(bp->GetSegment(),bp->GetOffset());
+		mem_readb_checked((PhysPt)address,&value);
+        if (bp){ 
+            bp->SetType(BKPNT_MEMORY_FREEZE);
+            bp->SetValue(value);
+        }
+		DEBUG_ShowMsg("DEBUG: Set memory freeze at %04X:%04X with value: %02X\n",seg,ofs,value);
 		return true;
 	}
 
@@ -3581,6 +3610,7 @@ bool ParseCommand(char* str) {
 		DEBUG_ShowMsg("SR [reg] [value]          - Set register value. Multiple pairs allowed.\n");
 		DEBUG_ShowMsg("SM [seg]:[off] [val] [.]..- Set memory with following values.\n");
 		DEBUG_ShowMsg("SMV [addr] [val] [.]..    - Set memory with following values at linear (virtual) address.\n");
+        DEBUG_ShowMsg("FM [seg]:[off]            - Freeze memory value at address.\n");
 		DEBUG_ShowMsg("EV [value [value] ...]    - Show register value(s).\n");
 		DEBUG_ShowMsg("IV [seg]:[off] [name]     - Create var name for memory address.\n");
 		DEBUG_ShowMsg("SV [filename]             - Save var list in file.\n");
@@ -3872,6 +3902,7 @@ extern "C" INPUT_RECORD * _pdcurses_hax_inputrecord(void);
 
 int32_t DEBUG_Run(int32_t amount,bool quickexit) {
 	skipFirstInstruction = true;
+	CPU_CycleLeft += CPU_Cycles - amount;
 	CPU_Cycles = amount;
 	int32_t ret = (int32_t)(*cpudecoder)();
 	if (quickexit) SetCodeWinStart();
@@ -5234,14 +5265,14 @@ void CDebugVar::DeleteAll(void)
 
 CDebugVar* CDebugVar::FindVar(PhysPt pt)
 {
-	if (varList.empty()) return 0;
+	if (varList.empty()) return nullptr;
 
 	std::vector<CDebugVar*>::size_type s = varList.size();
 	for(std::vector<CDebugVar*>::size_type i = 0; i != s; i++) {
 		CDebugVar* bp = varList[i];
 		if (bp->GetAdr() == pt) return bp;
 	}
-	return 0;
+	return nullptr;
 }
 
 bool CDebugVar::SaveVars(char* name) {

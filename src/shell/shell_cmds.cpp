@@ -119,7 +119,7 @@ SHELL_Cmd cmd_list[]={
 // Advanced commands specific to DOSBox-X
 //{	"ADDKEY",		1,		&DOS_Shell::CMD_ADDKEY,		"SHELL_CMD_ADDKEY_HELP"}, // ADDKEY as a program (Z:\BIN\ADDKEY.COM) instead of shell command
 {	"DX-CAPTURE",	1,		&DOS_Shell::CMD_DXCAPTURE,  "SHELL_CMD_DXCAPTURE_HELP"},
-{0,0,0,0}
+{ nullptr, 0, nullptr, nullptr }
 };
 
 const char *GetCmdName(int i) {
@@ -2089,21 +2089,29 @@ void DOS_Shell::CMD_DIR(char * args) {
 		if (!dirPaused(this, w_size, optP, optW)) {dos.dta(save_dta);return;}
 		uint8_t drive=dta.GetSearchDrive();
 		uint64_t free_space=1024u*1024u*100u;
-		if (Drives[drive]) {
-			uint32_t bytes_sector32;uint32_t sectors_cluster32;uint32_t total_clusters32;uint32_t free_clusters32;
-			if ((dos.version.major > 7 || (dos.version.major == 7 && dos.version.minor >= 10)) &&
-				Drives[drive]->AllocationInfo32(&bytes_sector32,&sectors_cluster32,&total_clusters32,&free_clusters32)) { /* FAT32 aware extended API */
-				freec=0;
-				free_space=(uint64_t)bytes_sector32 * (Bitu)sectors_cluster32 * (Bitu)free_clusters32;
-			} else {
-				uint16_t bytes_sector;uint8_t sectors_cluster;uint16_t total_clusters;uint16_t free_clusters;
-				rsize=true;
-				freec=0;
-				Drives[drive]->AllocationInfo(&bytes_sector,&sectors_cluster,&total_clusters,&free_clusters);
-				free_space=(uint64_t)bytes_sector * (Bitu)sectors_cluster * (Bitu)(freec?freec:free_clusters);
-				rsize=false;
-			}
-		}
+
+        if(Drives[drive]) {
+            uint32_t bytes_sector32; uint32_t sectors_cluster32; uint32_t total_clusters32; uint32_t free_clusters32;
+            uint64_t total_clusters64; uint64_t free_clusters64;
+            // Since this is the *internal* shell, we want use maximum available query capability at first
+            if(Drives[drive]->AllocationInfo64(&bytes_sector32, &sectors_cluster32, &total_clusters64, &free_clusters64)) {
+                freec = 0;
+                free_space = (uint64_t)bytes_sector32 * (Bitu)sectors_cluster32 * (Bitu)free_clusters64;
+            }
+            else if((dos.version.major > 7 || (dos.version.major == 7 && dos.version.minor >= 10)) &&
+                Drives[drive]->AllocationInfo32(&bytes_sector32, &sectors_cluster32, &total_clusters32, &free_clusters32)) { /* FAT32 aware extended API */
+                freec = 0;
+                free_space = (uint64_t)bytes_sector32 * (Bitu)sectors_cluster32 * (Bitu)free_clusters32;
+            }
+            else {
+                uint16_t bytes_sector; uint8_t sectors_cluster; uint16_t total_clusters; uint16_t free_clusters;
+                rsize = true;
+                freec = 0;
+                Drives[drive]->AllocationInfo(&bytes_sector, &sectors_cluster, &total_clusters, &free_clusters);
+                free_space = (uint64_t)bytes_sector * (Bitu)sectors_cluster * (Bitu)(freec ? freec : free_clusters);
+                rsize = false;
+            }
+        }
 #if defined(WIN32) && !(defined(__MINGW32__) && !defined(__MINGW64_VERSION_MAJOR))
 		if (Network_IsNetworkResource(args)) {
 			std::string str = MSG_Get("SHELL_CMD_DIR_BYTES_FREE");
@@ -2469,7 +2477,7 @@ void DOS_Shell::CMD_COPY(char * args) {
 		size_t pathTargetLen = strlen(pathTarget);
 		
 		// See if we have to substitute filename or extension
-		char *ext = 0;
+		char * ext = nullptr;
 		size_t replacementOffset = 0;
 		if (pathTarget[pathTargetLen-1]!='\\') { 
 				// only if it's not a directory
@@ -2511,7 +2519,7 @@ void DOS_Shell::CMD_COPY(char * args) {
 					*ext = 0;
 				} else if (ext[-1]) {
 					// we don't substitute anything, clear up
-					ext = 0;
+					ext = nullptr;
 				}
 			}
 		}
@@ -2599,17 +2607,21 @@ void DOS_Shell::CMD_COPY(char * args) {
 							int drive=strlen(nameTarget)>1&&(nameTarget[1]==':'||nameTarget[2]==':')?(toupper(nameTarget[nameTarget[0]=='"'?1:0])-'A'):-1;
                             if(drive >= 0 && Drives[drive]) {
                                 uint16_t bytes_sector; uint8_t sectors_cluster; uint16_t total_clusters; uint16_t free_clusters;
-                                uint32_t bytes32, sectors32, clusters32, free32;
-                                bool no_free_space = false;
+                                uint32_t bytes32 = 0, sectors32 = 0, clusters32 = 0, free32 = 0;
+                                bool no_free_space = true;
                                 rsize = true;
                                 freec = 0;
                                 if(dos.version.major > 7 || (dos.version.major == 7 && dos.version.minor >= 10)) {
                                     Drives[drive]->AllocationInfo32(&bytes32, &sectors32, &clusters32, &free32);
                                     no_free_space = (uint64_t)bytes32 * (uint64_t)sectors32 * (uint64_t)free32 < size ? true : false;
+                                    //LOG_MSG("drive=%u, no_free_space = %d bytes32=%u, sectors32=%u, free32 =%u, free_space=%u, size=%u",
+                                    //  drive, no_free_space ? 1 : 0, bytes32, sectors32, free32, bytes32*sectors32*free32, size);
                                 }
-                                else {
+                                if(bytes32 == 0 || sectors32 == 0 || dos.version.major < 7 || (dos.version.major == 7 && dos.version.minor < 10)) {
                                     Drives[drive]->AllocationInfo(&bytes_sector, &sectors_cluster, &total_clusters, &free_clusters);
                                     no_free_space = (Bitu)bytes_sector* (Bitu)sectors_cluster* (Bitu)(freec ? freec : free_clusters) < size ? true : false;
+                                    //LOG_MSG("no_free_space = %d bytes=%u, sectors=%u, free =%u, free_space=%u, size=%u",
+                                    // no_free_space ? 1 : 0, bytes_sector, sectors_cluster, freec, bytes_sector*sectors_cluster*free_clusters, size);
                                 }
                                 rsize = false;
 								if (no_free_space) {
@@ -3259,7 +3271,7 @@ void DOS_Shell::CMD_SUBST(char * args) {
 		strcpy(mountstring,"MOUNT ");
 		StripSpaces(args);
 		std::string arg;
-		CommandLine command(0,args);
+		CommandLine command(nullptr, args);
 		if (!command.GetCount()) {
 			char name[DOS_NAMELENGTH_ASCII],lname[LFN_NAMELENGTH];
 			uint32_t size,hsize;uint16_t date;uint16_t time;uint8_t attr;
@@ -3323,8 +3335,8 @@ void DOS_Shell::CMD_SUBST(char * args) {
         else strcpy(dir,arg.c_str());
         if (!DOS_MakeName(dir,fulldir,&drive)) throw 3;
 	
-		localDrive* ldp=0;
-		if( ( ldp=dynamic_cast<localDrive*>(Drives[drive])) == 0 ) throw 4;
+		localDrive * const ldp = dynamic_cast<localDrive*>(Drives[drive]);
+		if (!ldp) throw 4;
 		char newname[CROSS_LEN];   
 		strcpy(newname, ldp->basedir);	   
 		strcat(newname,fulldir);
@@ -4195,10 +4207,9 @@ void DOS_Shell::CMD_ALIAS(char* args) {
         }
     } else {
         char alias_name[256] = { 0 };
-        char* cmd = 0;
         for (unsigned int offset = 0; *args && offset < sizeof(alias_name)-1; ++offset, ++args) {
             if (*args == '=') {
-                cmd = trim(alias_name);
+                char * const cmd = trim(alias_name);
                 ++args;
                 args = trim(args);
                 size_t args_len = strlen(args);
@@ -4231,10 +4242,9 @@ void DOS_Shell::CMD_ASSOC(char* args) {
         }
     } else {
         char assoc_name[256] = { 0 };
-        char* cmd = 0;
         for (unsigned int offset = 0; *args && offset < sizeof(assoc_name)-1; ++offset, ++args) {
             if (*args == '=') {
-                cmd = trim(assoc_name);
+                char * const cmd = trim(assoc_name);
                 if (!*cmd || cmd[0] != '.') {
                     WriteOut(MSG_Get("SHELL_INVALID_PARAMETER"), cmd);
                     break;

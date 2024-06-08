@@ -18,6 +18,7 @@
 
 #include <assert.h>
 #include <string.h>
+#include <cstdint>
 
 #include "callback.h"
 #include "logging.h"
@@ -90,7 +91,7 @@ uint8_t CALLBACK_Allocate(void) {
 	for (uint8_t i=1;(i<CB_MAX);i++) {
 		if (CallBack_Handlers[i]==&illegal_handler) {
 			if (CallBack_Description[i] != NULL) LOG_MSG("CALLBACK_Allocate() warning: empty slot still has description string!\n");
-			CallBack_Handlers[i]=0;
+			CallBack_Handlers[i]=nullptr;
 			return i;
 		}
 	}
@@ -228,7 +229,10 @@ void CALLBACK_RunRealInt(uint8_t intnum) {
 	SegSet16(cs,oldcs);
 }
 
-void CALLBACK_SZF(bool val) {
+namespace {
+
+template <std::uint32_t FLAG>
+inline void CALLBACK_SET_FLAG(bool const val) {
 	uint32_t tempf;
 
 	if (cpu.pmode && !(reg_flags & FLAG_VM)) {
@@ -244,8 +248,8 @@ void CALLBACK_SZF(bool val) {
 			tempf = real_readw(SegValue(ss),reg_sp+4); // first word past FAR 16:16
 	}
 
-	if (val) tempf |= FLAG_ZF;
-	else tempf &= ~FLAG_ZF;
+	if (val) tempf |= FLAG;
+	else tempf &= ~FLAG;
 
 	if (cpu.pmode && !(reg_flags & FLAG_VM)) {
 		if (cpu.stack.big)
@@ -261,75 +265,15 @@ void CALLBACK_SZF(bool val) {
 	}
 }
 
-void CALLBACK_SCF(bool val) {
-	uint32_t tempf;
+} // anonymous namespace
 
-	if (cpu.pmode && !(reg_flags & FLAG_VM)) {
-		if (cpu.stack.big)
-			tempf = mem_readd(SegPhys(ss)+reg_esp+8); // first word past FAR 32:32
-		else
-			tempf = mem_readw(SegPhys(ss)+reg_sp+4); // first word past FAR 16:16
-	}
-	else {
-		if (cpu.stack.big)
-			tempf = real_readd(SegValue(ss),reg_esp+8); // first word past FAR 32:32
-		else
-			tempf = real_readw(SegValue(ss),reg_sp+4); // first word past FAR 16:16
-	}
-
-	if (val) tempf |= FLAG_CF;
-	else tempf &= ~FLAG_CF;
-
-	if (cpu.pmode && !(reg_flags & FLAG_VM)) {
-		if (cpu.stack.big)
-			mem_writed(SegPhys(ss)+reg_esp+8,tempf);
-		else
-			mem_writew(SegPhys(ss)+reg_sp+4,(uint16_t)tempf);
-	}
-	else {
-		if (cpu.stack.big)
-			real_writed(SegValue(ss),reg_esp+8,tempf);
-		else
-			real_writew(SegValue(ss),reg_sp+4,(uint16_t)tempf);
-	}
-}
-
-void CALLBACK_SIF(bool val) {
-	uint32_t tempf;
-
-	if (cpu.pmode && !(reg_flags & FLAG_VM)) {
-		if (cpu.stack.big)
-			tempf = mem_readd(SegPhys(ss)+reg_esp+8); // first word past FAR 32:32
-		else
-			tempf = mem_readw(SegPhys(ss)+reg_sp+4); // first word past FAR 16:16
-	}
-	else {
-		if (cpu.stack.big)
-			tempf = real_readd(SegValue(ss),reg_esp+8); // first word past FAR 32:32
-		else
-			tempf = real_readw(SegValue(ss),reg_sp+4); // first word past FAR 16:16
-	}
-
-	if (val) tempf |= FLAG_IF;
-	else tempf &= ~FLAG_IF;
-
-	if (cpu.pmode && !(reg_flags & FLAG_VM)) {
-		if (cpu.stack.big)
-			mem_writed(SegPhys(ss)+reg_esp+8,tempf);
-		else
-			mem_writew(SegPhys(ss)+reg_sp+4,(uint16_t)tempf);
-	}
-	else {
-		if (cpu.stack.big)
-			real_writed(SegValue(ss),reg_esp+8,tempf);
-		else
-			real_writew(SegValue(ss),reg_sp+4,(uint16_t)tempf);
-	}
-}
+void CALLBACK_SZF(bool const val) { CALLBACK_SET_FLAG<FLAG_ZF>(val); }
+void CALLBACK_SCF(bool const val) { CALLBACK_SET_FLAG<FLAG_CF>(val); }
+void CALLBACK_SIF(bool const val) { CALLBACK_SET_FLAG<FLAG_IF>(val); }
 
 void CALLBACK_SetDescription(Bitu nr, const char* descr) {
 	if (CallBack_Description[nr]) delete[] CallBack_Description[nr];
-	CallBack_Description[nr] = 0;
+	CallBack_Description[nr] = nullptr;
 
 	if (descr != NULL) {
 		CallBack_Description[nr] = new char[strlen(descr)+1];
@@ -338,7 +282,7 @@ void CALLBACK_SetDescription(Bitu nr, const char* descr) {
 }
 
 const char* CALLBACK_GetDescription(Bitu nr) {
-	if (nr>=CB_MAX) return 0;
+	if (nr>=CB_MAX) return nullptr;
 	return CallBack_Description[nr];
 }
 
@@ -876,7 +820,7 @@ void CALLBACK_HandlerObject::Uninstall(){
 		//Do nothing. Merely DeAllocate the callback
 	} else E_Exit("what kind of callback is this!");
 	if(CallBack_Description[m_callback]) delete [] CallBack_Description[m_callback];
-	CallBack_Description[m_callback] = 0;
+	CallBack_Description[m_callback] = nullptr;
 	CALLBACK_DeAllocate(m_callback);
 	installed=false;
 }

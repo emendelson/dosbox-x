@@ -5003,7 +5003,7 @@ void VGA_sof_debug_video_info(void) {
 		 * VGA: Each mode produces 4-bit pixels per dot clock (256-color mode loads 2 4-bit pixels and emits the 8-bit value per every other dot clock).
 		 *      Text modes and EGA/VGA 16-color modes produce values 0-15, CGA 4-color 0-3, CGA 2-color and monochrome EGA/MCGA 0-1,
 		 *      and 256-color mode 0-15 for each half of the 8-bit pixel value. Note that on EGA/VGA, there's a "color plane enable"
-		 *      register that is used to make sure CGA 2-color and monochrone MCGA modes are limited to one bitplane, in fact CGA 2-color
+		 *      register that is used to make sure CGA 2-color and monochrome MCGA modes are limited to one bitplane, in fact CGA 2-color
 		 *      and MCGA monochrome modes are really just EGA 16-color modes with only one bitplane enabled for display and writing
 		 *      and the memory map set up to emulate non-planar video memory like the DOS application expects. CGA 4-color is still one
 		 *      bitplane with odd/even mode enabled and a bit that instructs the hardware to latch 2 bits at a time which are then internally
@@ -5027,7 +5027,7 @@ void VGA_sof_debug_video_info(void) {
 		 *      Tseng ET4000 cards... doing that will instead give you a 320x200 screen that is not pixel doubled and is squeezed on
 		 *      the right half of the screen with garbage data on the left half).
 		 *
-		 *      Got it? Good. This complexity is why most games written for EGA work pefectly fine on VGA, even if they play with the
+		 *      Got it? Good. This complexity is why most games written for EGA work perfectly fine on VGA, even if they play with the
 		 *      EGA palette in the Attribute Controller or color plane masks.
 		 *
 		 * NOTES: A good test case for the color plane enable:
@@ -5560,7 +5560,7 @@ void WriteARawImage(rawscreenshot &rawimg,rawscreenshot &rawpal,const char *ext)
 		}
 	}
 	/* Finish writing */
-	png_write_end(png_ptr, 0);
+	png_write_end(png_ptr, nullptr);
 	/* If a second palette was provided, write it */
 	if (rawpal.image_palette2 != NULL) png_write_chunk(png_ptr, (png_const_bytep)("rPAL"), rawpal.image_palette2, rawpal.image_palette2_size*3);
 	/*Destroy PNG structs*/
@@ -5892,6 +5892,13 @@ static void VGA_VerticalTimer(Bitu /*val*/) {
 			vga.draw.byte_panning_shift = 4u;
 			vga.draw.address += vga.draw.bytes_skip;
 			vga.draw.address *= vga.draw.byte_panning_shift;
+
+			/* Even in EGA/VGA 16-color modes, where the CRTC is normally in BYTE mode, there are demos that
+			 * switch the CRTC to other non-BYTE modes:
+			 *
+			 * - "Unreal" by Future Crew, "Vectorballs", CRTC WORD mode */
+			vga.draw.linear_mask = 0x3ffffu;
+			vga.draw.address *= (Bitu)1u << (Bitu)vga.config.addr_shift; /* NTS: Remember the bizarre 4 x 4 mode most SVGA chipsets do */
 			break;
 		case M_VGA:
 			/* TODO: Various SVGA chipsets have a bit to enable/disable 256KB wrapping */
@@ -6743,7 +6750,7 @@ void VGA_SetupDrawing(Bitu /*val*/) {
 		hdend += 1;
 		vdend += 1;
 
-		// horitzontal blanking
+		// horizontal blanking
 		if (hbend <= (hbstart & hbend_mask)) hbend += hbend_mask + 1;
 		hbend += hbstart - (hbstart & hbend_mask);
 
@@ -7041,7 +7048,7 @@ void VGA_SetupDrawing(Bitu /*val*/) {
 	//Seems regular vga only listens to the 9 char pixel mode with character mode enabled
 	//Base pixel height around vertical totals of modes that have 100 clocks horizontal
 	//Different sync values gives different scaling of the whole vertical range
-	//VGA monitor just seems to thighten or widen the whole vertical range
+	//VGA monitor just seems to tighten or widen the whole vertical range
 
 	vga.draw.resizing=false;
 	vga.draw.has_split=false;

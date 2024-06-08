@@ -76,100 +76,100 @@
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'" Label="Configuration">
     <ConfigurationType>Application</ConfigurationType>
-    <PlatformToolset>v143</PlatformToolset>
+    <PlatformToolset>v142</PlatformToolset>
     <CharacterSet>MultiByte</CharacterSet>
     <WholeProgramOptimization>true</WholeProgramOptimization>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release SDL2|Win32'" Label="Configuration">
     <ConfigurationType>Application</ConfigurationType>
-    <PlatformToolset>v143</PlatformToolset>
+    <PlatformToolset>v142</PlatformToolset>
     <CharacterSet>MultiByte</CharacterSet>
     <WholeProgramOptimization>true</WholeProgramOptimization>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'" Label="Configuration">
     <ConfigurationType>Application</ConfigurationType>
-    <PlatformToolset>v143</PlatformToolset>
+    <PlatformToolset>v142</PlatformToolset>
     <CharacterSet>MultiByte</CharacterSet>
     <UseDebugLibraries>true</UseDebugLibraries>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug SDL2|Win32'" Label="Configuration">
     <ConfigurationType>Application</ConfigurationType>
-    <PlatformToolset>v143</PlatformToolset>
+    <PlatformToolset>v142</PlatformToolset>
     <CharacterSet>MultiByte</CharacterSet>
     <UseDebugLibraries>true</UseDebugLibraries>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'" Label="Configuration">
     <ConfigurationType>Application</ConfigurationType>
-    <PlatformToolset>v143</PlatformToolset>
+    <PlatformToolset>v142</PlatformToolset>
     <CharacterSet>MultiByte</CharacterSet>
     <WholeProgramOptimization>true</WholeProgramOptimization>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|ARM64'" Label="Configuration">
     <ConfigurationType>Application</ConfigurationType>
-    <PlatformToolset>v143</PlatformToolset>
+    <PlatformToolset>v142</PlatformToolset>
     <CharacterSet>MultiByte</CharacterSet>
     <WholeProgramOptimization>true</WholeProgramOptimization>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|ARM'" Label="Configuration">
     <ConfigurationType>Application</ConfigurationType>
-    <PlatformToolset>v143</PlatformToolset>
+    <PlatformToolset>v142</PlatformToolset>
     <CharacterSet>MultiByte</CharacterSet>
     <WholeProgramOptimization>true</WholeProgramOptimization>
     <WindowsSDKDesktopARMSupport>true</WindowsSDKDesktopARMSupport>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release SDL2|x64'" Label="Configuration">
     <ConfigurationType>Application</ConfigurationType>
-    <PlatformToolset>v143</PlatformToolset>
+    <PlatformToolset>v142</PlatformToolset>
     <CharacterSet>MultiByte</CharacterSet>
     <WholeProgramOptimization>true</WholeProgramOptimization>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release SDL2|ARM64'" Label="Configuration">
     <ConfigurationType>Application</ConfigurationType>
-    <PlatformToolset>v143</PlatformToolset>
+    <PlatformToolset>v142</PlatformToolset>
     <CharacterSet>MultiByte</CharacterSet>
     <WholeProgramOptimization>true</WholeProgramOptimization>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release SDL2|ARM'" Label="Configuration">
     <ConfigurationType>Application</ConfigurationType>
-    <PlatformToolset>v143</PlatformToolset>
+    <PlatformToolset>v142</PlatformToolset>
     <CharacterSet>MultiByte</CharacterSet>
     <WholeProgramOptimization>true</WholeProgramOptimization>
     <WindowsSDKDesktopARMSupport>true</WindowsSDKDesktopARMSupport>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'" Label="Configuration">
     <ConfigurationType>Application</ConfigurationType>
-    <PlatformToolset>v143</PlatformToolset>
+    <PlatformToolset>v142</PlatformToolset>
     <CharacterSet>MultiByte</CharacterSet>
     <UseDebugLibraries>true</UseDebugLibraries>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|ARM64'" Label="Configuration">
     <ConfigurationType>Application</ConfigurationType>
-    <PlatformToolset>v143</PlatformToolset>
+    <PlatformToolset>v142</PlatformToolset>
     <CharacterSet>MultiByte</CharacterSet>
     <UseDebugLibraries>true</UseDebugLibraries>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|ARM'" Label="Configuration">
     <ConfigurationType>Application</ConfigurationType>
-    <PlatformToolset>v143</PlatformToolset>
+    <PlatformToolset>v142</PlatformToolset>
     <CharacterSet>MultiByte</CharacterSet>
     <WindowsSDKDesktopARMSupport>true</WindowsSDKDesktopARMSupport>
     <UseDebugLibraries>true</UseDebugLibraries>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug SDL2|x64'" Label="Configuration">
     <ConfigurationType>Application</ConfigurationType>
-    <PlatformToolset>v143</PlatformToolset>
+    <PlatformToolset>v142</PlatformToolset>
     <CharacterSet>MultiByte</CharacterSet>
     <UseDebugLibraries>true</UseDebugLibraries>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug SDL2|ARM64'" Label="Configuration">
     <ConfigurationType>Application</ConfigurationType>
-    <PlatformToolset>v143</PlatformToolset>
+    <PlatformToolset>v142</PlatformToolset>
     <CharacterSet>MultiByte</CharacterSet>
     <UseDebugLibraries>true</UseDebugLibraries>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug SDL2|ARM'" Label="Configuration">
     <ConfigurationType>Application</ConfigurationType>
-    <PlatformToolset>v143</PlatformToolset>
+    <PlatformToolset>v142</PlatformToolset>
     <CharacterSet>MultiByte</CharacterSet>
     <WindowsSDKDesktopARMSupport>true</WindowsSDKDesktopARMSupport>
     <UseDebugLibraries>true</UseDebugLibraries>
@@ -389,15 +389,7 @@ copy "$(SolutionDir)\..\contrib\windows\shaders\*.*" "$(OutputPath)\shaders\"
 if not exist "$(OutputPath)\glshaders\" mkdir "$(OutputPath)\glshaders"
 copy "$(SolutionDir)\..\contrib\glshaders\*.*" "$(OutputPath)\glshaders\"
 if not exist "$(OutputPath)\languages\" mkdir "$(OutputPath)\languages"
-for /d %%i in ($(SolutionDir)\..\contrib\translations\*) do copy %%i\*.lng "$(OutputPath)\languages\"
-if not exist "$(OutputPath)\resources\" mkdir "$(OutputPath)\resources"
-copy "$(SolutionDir)\..\contrib\Windows\resources\*.*" "$(OutputPath)\resources\"
-if not exist "$(OutputPath)\Storage\" mkdir "$(OutputPath)\Storage"
-copy "$(SolutionDir)\..\contrib\Windows\Storage\*.*" "$(OutputPath)\Storage\"
-copy "$(SolutionDir)\..\contrib\Windows\resources\dosbox-x.conf" "$(OutputPath)\dosbox-x.conf"
-del "$(OutputPath)\resources\dosbox-x.conf"
-copy "$(SolutionDir)\..\contrib\Windows\resources\dosbox-x.conf" "$(OutputPath)\resources\dosbox-x-original.conf"
-</Command>
+for /d %%i in ("$(SolutionDir)\..\contrib\translations\*") do copy "%%i\*.lng" "$(OutputPath)\languages\"</Command>
     </PostBuildEvent>
     <PostBuildEvent>
       <Message>
@@ -445,15 +437,7 @@ copy "$(SolutionDir)\..\contrib\windows\shaders\*.*" "$(OutputPath)\shaders\"
 if not exist "$(OutputPath)\glshaders\" mkdir "$(OutputPath)\glshaders"
 copy "$(SolutionDir)\..\contrib\glshaders\*.*" "$(OutputPath)\glshaders\"
 if not exist "$(OutputPath)\languages\" mkdir "$(OutputPath)\languages"
-for /d %%i in ($(SolutionDir)\..\contrib\translations\*) do copy %%i\*.lng "$(OutputPath)\languages\"
-if not exist "$(OutputPath)\resources\" mkdir "$(OutputPath)\resources"
-copy "$(SolutionDir)\..\contrib\Windows\resources\*.*" "$(OutputPath)\resources\"
-if not exist "$(OutputPath)\Storage\" mkdir "$(OutputPath)\Storage"
-copy "$(SolutionDir)\..\contrib\Windows\Storage\*.*" "$(OutputPath)\Storage\"
-copy "$(SolutionDir)\..\contrib\Windows\resources\dosbox-x.conf" "$(OutputPath)\dosbox-x.conf"
-del "$(OutputPath)\resources\dosbox-x.conf"
-copy "$(SolutionDir)\..\contrib\Windows\resources\dosbox-x.conf" "$(OutputPath)\resources\dosbox-x-original.conf"
-</Command>
+for /d %%i in ("$(SolutionDir)\..\contrib\translations\*") do copy "%%i\*.lng" "$(OutputPath)\languages\"</Command>
     </PostBuildEvent>
     <PostBuildEvent>
       <Message>
@@ -497,7 +481,7 @@ copy "$(SolutionDir)\..\contrib\windows\shaders\*.*" "$(OutputPath)\shaders\"
 if not exist "$(OutputPath)\glshaders\" mkdir "$(OutputPath)\glshaders"
 copy "$(SolutionDir)\..\contrib\glshaders\*.*" "$(OutputPath)\glshaders\"
 if not exist "$(OutputPath)\languages\" mkdir "$(OutputPath)\languages"
-for /d %%i in ($(SolutionDir)\..\contrib\translations\*) do copy %%i\*.lng "$(OutputPath)\languages\"</Command>
+for /d %%i in ("$(SolutionDir)\..\contrib\translations\*") do copy "%%i\*.lng" "$(OutputPath)\languages\"</Command>
       <Message>
       </Message>
     </PostBuildEvent>
@@ -541,7 +525,7 @@ copy "$(SolutionDir)\..\contrib\windows\shaders\*.*" "$(OutputPath)\shaders\"
 if not exist "$(OutputPath)\glshaders\" mkdir "$(OutputPath)\glshaders"
 copy "$(SolutionDir)\..\contrib\glshaders\*.*" "$(OutputPath)\glshaders\"
 if not exist "$(OutputPath)\languages\" mkdir "$(OutputPath)\languages"
-for /d %%i in ($(SolutionDir)\..\contrib\translations\*) do copy %%i\*.lng "$(OutputPath)\languages\"</Command>
+for /d %%i in ("$(SolutionDir)\..\contrib\translations\*") do copy "%%i\*.lng" "$(OutputPath)\languages\"</Command>
       <Message>
       </Message>
     </PostBuildEvent>
@@ -585,7 +569,7 @@ copy "$(SolutionDir)\..\contrib\windows\shaders\*.*" "$(OutputPath)\shaders\"
 if not exist "$(OutputPath)\glshaders\" mkdir "$(OutputPath)\glshaders"
 copy "$(SolutionDir)\..\contrib\glshaders\*.*" "$(OutputPath)\glshaders\"
 if not exist "$(OutputPath)\languages\" mkdir "$(OutputPath)\languages"
-for /d %%i in ($(SolutionDir)\..\contrib\translations\*) do copy %%i\*.lng "$(OutputPath)\languages\"</Command>
+for /d %%i in ("$(SolutionDir)\..\contrib\translations\*") do copy "%%i\*.lng" "$(OutputPath)\languages\"</Command>
       <Message>
       </Message>
     </PostBuildEvent>
@@ -632,7 +616,7 @@ copy "$(SolutionDir)\..\contrib\windows\shaders\*.*" "$(OutputPath)\shaders\"
 if not exist "$(OutputPath)\glshaders\" mkdir "$(OutputPath)\glshaders"
 copy "$(SolutionDir)\..\contrib\glshaders\*.*" "$(OutputPath)\glshaders\"
 if not exist "$(OutputPath)\languages\" mkdir "$(OutputPath)\languages"
-for /d %%i in ($(SolutionDir)\..\contrib\translations\*) do copy %%i\*.lng "$(OutputPath)\languages\"</Command>
+for /d %%i in ("$(SolutionDir)\..\contrib\translations\*") do copy "%%i\*.lng" "$(OutputPath)\languages\"</Command>
       <Message>
       </Message>
     </PostBuildEvent>
@@ -676,7 +660,7 @@ copy "$(SolutionDir)\..\contrib\windows\shaders\*.*" "$(OutputPath)\shaders\"
 if not exist "$(OutputPath)\glshaders\" mkdir "$(OutputPath)\glshaders"
 copy "$(SolutionDir)\..\contrib\glshaders\*.*" "$(OutputPath)\glshaders\"
 if not exist "$(OutputPath)\languages\" mkdir "$(OutputPath)\languages"
-for /d %%i in ($(SolutionDir)\..\contrib\translations\*) do copy %%i\*.lng "$(OutputPath)\languages\"</Command>
+for /d %%i in ("$(SolutionDir)\..\contrib\translations\*") do copy "%%i\*.lng" "$(OutputPath)\languages\"</Command>
       <Message>
       </Message>
     </PostBuildEvent>
@@ -720,7 +704,7 @@ copy "$(SolutionDir)\..\contrib\windows\shaders\*.*" "$(OutputPath)\shaders\"
 if not exist "$(OutputPath)\glshaders\" mkdir "$(OutputPath)\glshaders"
 copy "$(SolutionDir)\..\contrib\glshaders\*.*" "$(OutputPath)\glshaders\"
 if not exist "$(OutputPath)\languages\" mkdir "$(OutputPath)\languages"
-for /d %%i in ($(SolutionDir)\..\contrib\translations\*) do copy %%i\*.lng "$(OutputPath)\languages\"</Command>
+for /d %%i in ("$(SolutionDir)\..\contrib\translations\*") do copy "%%i\*.lng" "$(OutputPath)\languages\"</Command>
       <Message>
       </Message>
     </PostBuildEvent>
@@ -771,15 +755,7 @@ copy "$(SolutionDir)\..\contrib\windows\shaders\*.*" "$(OutputPath)\shaders\"
 if not exist "$(OutputPath)\glshaders\" mkdir "$(OutputPath)\glshaders"
 copy "$(SolutionDir)\..\contrib\glshaders\*.*" "$(OutputPath)\glshaders\"
 if not exist "$(OutputPath)\languages\" mkdir "$(OutputPath)\languages"
-for /d %%i in ($(SolutionDir)\..\contrib\translations\*) do copy %%i\*.lng "$(OutputPath)\languages\"
-if not exist "$(OutputPath)\resources\" mkdir "$(OutputPath)\resources"
-copy "$(SolutionDir)\..\contrib\Windows\resources\*.*" "$(OutputPath)\resources\"
-if not exist "$(OutputPath)\Storage\" mkdir "$(OutputPath)\Storage"
-copy "$(SolutionDir)\..\contrib\Windows\Storage\*.*" "$(OutputPath)\Storage\"
-copy "$(SolutionDir)\..\contrib\Windows\resources\dosbox-x.conf" "$(OutputPath)\dosbox-x.conf"
-del "$(OutputPath)\resources\dosbox-x.conf"
-copy "$(SolutionDir)\..\contrib\Windows\resources\dosbox-x.conf" "$(OutputPath)\resources\dosbox-x-original.conf"
-</Command>
+for /d %%i in ("$(SolutionDir)\..\contrib\translations\*") do copy "%%i\*.lng" "$(OutputPath)\languages\"</Command>
     </PostBuildEvent>
     <PostBuildEvent>
       <Message>
@@ -828,15 +804,7 @@ copy "$(SolutionDir)\..\contrib\windows\shaders\*.*" "$(OutputPath)\shaders\"
 if not exist "$(OutputPath)\glshaders\" mkdir "$(OutputPath)\glshaders"
 copy "$(SolutionDir)\..\contrib\glshaders\*.*" "$(OutputPath)\glshaders\"
 if not exist "$(OutputPath)\languages\" mkdir "$(OutputPath)\languages"
-for /d %%i in ($(SolutionDir)\..\contrib\translations\*) do copy %%i\*.lng "$(OutputPath)\languages\"
-if not exist "$(OutputPath)\resources\" mkdir "$(OutputPath)\resources"
-copy "$(SolutionDir)\..\contrib\Windows\resources\*.*" "$(OutputPath)\resources\"
-if not exist "$(OutputPath)\Storage\" mkdir "$(OutputPath)\Storage"
-copy "$(SolutionDir)\..\contrib\Windows\Storage\*.*" "$(OutputPath)\Storage\"
-copy "$(SolutionDir)\..\contrib\Windows\resources\dosbox-x.conf" "$(OutputPath)\dosbox-x.conf"
-del "$(OutputPath)\resources\dosbox-x.conf"
-copy "$(SolutionDir)\..\contrib\Windows\resources\dosbox-x.conf" "$(OutputPath)\resources\dosbox-x-original.conf"
-</Command>
+for /d %%i in ("$(SolutionDir)\..\contrib\translations\*") do copy "%%i\*.lng" "$(OutputPath)\languages\"</Command>
     </PostBuildEvent>
     <PostBuildEvent>
       <Message>
@@ -881,15 +849,7 @@ copy "$(SolutionDir)\..\contrib\windows\shaders\*.*" "$(OutputPath)\shaders\"
 if not exist "$(OutputPath)\glshaders\" mkdir "$(OutputPath)\glshaders"
 copy "$(SolutionDir)\..\contrib\glshaders\*.*" "$(OutputPath)\glshaders\"
 if not exist "$(OutputPath)\languages\" mkdir "$(OutputPath)\languages"
-for /d %%i in ($(SolutionDir)\..\contrib\translations\*) do copy %%i\*.lng "$(OutputPath)\languages\"
-if not exist "$(OutputPath)\resources\" mkdir "$(OutputPath)\resources"
-copy "$(SolutionDir)\..\contrib\Windows\resources\*.*" "$(OutputPath)\resources\"
-if not exist "$(OutputPath)\Storage\" mkdir "$(OutputPath)\Storage"
-copy "$(SolutionDir)\..\contrib\Windows\Storage\*.*" "$(OutputPath)\Storage\"
-copy "$(SolutionDir)\..\contrib\Windows\resources\dosbox-x.conf" "$(OutputPath)\dosbox-x.conf"
-del "$(OutputPath)\resources\dosbox-x.conf"
-copy "$(SolutionDir)\..\contrib\Windows\resources\dosbox-x.conf" "$(OutputPath)\resources\dosbox-x-original.conf"
-</Command>
+for /d %%i in ("$(SolutionDir)\..\contrib\translations\*") do copy "%%i\*.lng" "$(OutputPath)\languages\"</Command>
       <Message>
       </Message>
     </PostBuildEvent>
@@ -934,7 +894,7 @@ copy "$(SolutionDir)\..\contrib\windows\shaders\*.*" "$(OutputPath)\shaders\"
 if not exist "$(OutputPath)\glshaders\" mkdir "$(OutputPath)\glshaders"
 copy "$(SolutionDir)\..\contrib\glshaders\*.*" "$(OutputPath)\glshaders\"
 if not exist "$(OutputPath)\languages\" mkdir "$(OutputPath)\languages"
-for /d %%i in ($(SolutionDir)\..\contrib\translations\*) do copy %%i\*.lng "$(OutputPath)\languages\"</Command>
+for /d %%i in ("$(SolutionDir)\..\contrib\translations\*") do copy "%%i\*.lng" "$(OutputPath)\languages\"</Command>
       <Message>
       </Message>
     </PostBuildEvent>
@@ -979,7 +939,7 @@ copy "$(SolutionDir)\..\contrib\windows\shaders\*.*" "$(OutputPath)\shaders\"
 if not exist "$(OutputPath)\glshaders\" mkdir "$(OutputPath)\glshaders"
 copy "$(SolutionDir)\..\contrib\glshaders\*.*" "$(OutputPath)\glshaders\"
 if not exist "$(OutputPath)\languages\" mkdir "$(OutputPath)\languages"
-for /d %%i in ($(SolutionDir)\..\contrib\translations\*) do copy %%i\*.lng "$(OutputPath)\languages\"</Command>
+for /d %%i in ("$(SolutionDir)\..\contrib\translations\*") do copy "%%i\*.lng" "$(OutputPath)\languages\"</Command>
       <Message>
       </Message>
     </PostBuildEvent>
@@ -1027,15 +987,7 @@ copy "$(SolutionDir)\..\contrib\windows\shaders\*.*" "$(OutputPath)\shaders\"
 if not exist "$(OutputPath)\glshaders\" mkdir "$(OutputPath)\glshaders"
 copy "$(SolutionDir)\..\contrib\glshaders\*.*" "$(OutputPath)\glshaders\"
 if not exist "$(OutputPath)\languages\" mkdir "$(OutputPath)\languages"
-for /d %%i in ($(SolutionDir)\..\contrib\translations\*) do copy %%i\*.lng "$(OutputPath)\languages\"
-if not exist "$(OutputPath)\resources\" mkdir "$(OutputPath)\resources"
-copy "$(SolutionDir)\..\contrib\Windows\resources\*.*" "$(OutputPath)\resources\"
-if not exist "$(OutputPath)\Storage\" mkdir "$(OutputPath)\Storage"
-copy "$(SolutionDir)\..\contrib\Windows\Storage\*.*" "$(OutputPath)\Storage\"
-copy "$(SolutionDir)\..\contrib\Windows\resources\dosbox-x.conf" "$(OutputPath)\dosbox-x.conf"
-del "$(OutputPath)\resources\dosbox-x.conf"
-copy "$(SolutionDir)\..\contrib\Windows\resources\dosbox-x.conf" "$(OutputPath)\resources\dosbox-x-original.conf"
-</Command>
+for /d %%i in ("$(SolutionDir)\..\contrib\translations\*") do copy "%%i\*.lng" "$(OutputPath)\languages\"</Command>
       <Message>
       </Message>
     </PostBuildEvent>
@@ -1080,7 +1032,7 @@ copy "$(SolutionDir)\..\contrib\windows\shaders\*.*" "$(OutputPath)\shaders\"
 if not exist "$(OutputPath)\glshaders\" mkdir "$(OutputPath)\glshaders"
 copy "$(SolutionDir)\..\contrib\glshaders\*.*" "$(OutputPath)\glshaders\"
 if not exist "$(OutputPath)\languages\" mkdir "$(OutputPath)\languages"
-for /d %%i in ($(SolutionDir)\..\contrib\translations\*) do copy %%i\*.lng "$(OutputPath)\languages\"</Command>
+for /d %%i in ("$(SolutionDir)\..\contrib\translations\*") do copy "%%i\*.lng" "$(OutputPath)\languages\"</Command>
       <Message>
       </Message>
     </PostBuildEvent>
@@ -1125,7 +1077,7 @@ copy "$(SolutionDir)\..\contrib\windows\shaders\*.*" "$(OutputPath)\shaders\"
 if not exist "$(OutputPath)\glshaders\" mkdir "$(OutputPath)\glshaders"
 copy "$(SolutionDir)\..\contrib\glshaders\*.*" "$(OutputPath)\glshaders\"
 if not exist "$(OutputPath)\languages\" mkdir "$(OutputPath)\languages"
-for /d %%i in ($(SolutionDir)\..\contrib\translations\*) do copy %%i\*.lng "$(OutputPath)\languages\"</Command>
+for /d %%i in ("$(SolutionDir)\..\contrib\translations\*") do copy "%%i\*.lng" "$(OutputPath)\languages\"</Command>
       <Message>
       </Message>
     </PostBuildEvent>
@@ -1138,9 +1090,11 @@ for /d %%i in ($(SolutionDir)\..\contrib\translations\*) do copy %%i\*.lng "$(Ou
   <ItemGroup>
     <ClCompile Include="..\src\builtin\25_com.cpp" />
     <ClCompile Include="..\src\builtin\28_com.cpp" />
+    <ClCompile Include="..\src\builtin\4dos.cpp" />
     <ClCompile Include="..\src\builtin\50_com.cpp" />
     <ClCompile Include="..\src\builtin\append_exe.cpp" />
     <ClCompile Include="..\src\builtin\buffers_com.cpp" />
+    <ClCompile Include="..\src\builtin\cdplay.cpp" />
     <ClCompile Include="..\src\builtin\chkdsk_exe.cpp" />
     <ClCompile Include="..\src\builtin\cwsdpmi_exe.cpp" />
     <ClCompile Include="..\src\builtin\debug_exe.cpp" />
@@ -1149,26 +1103,35 @@ for /d %%i in ($(SolutionDir)\..\contrib\translations\*) do copy %%i\*.lng "$(Ou
     <ClCompile Include="..\src\builtin\dos32a_exe.cpp" />
     <ClCompile Include="..\src\builtin\dos4gw_exe.cpp" />
     <ClCompile Include="..\src\builtin\dosidle_exe.cpp" />
+    <ClCompile Include="..\src\builtin\dosmid.cpp" />
     <ClCompile Include="..\src\builtin\dsxmenu_exe_pc.cpp" />
     <ClCompile Include="..\src\builtin\dsxmenu_exe_pc98.cpp" />
     <ClCompile Include="..\src\builtin\diskcopy_exe.cpp" />
     <ClCompile Include="..\src\builtin\edit_com.cpp" />
+    <ClCompile Include="..\src\builtin\emsmagic.cpp" />
+    <ClCompile Include="..\src\builtin\eval.cpp" />
     <ClCompile Include="..\src\builtin\fc_exe.cpp" />
     <ClCompile Include="..\src\builtin\fcbs_com.cpp" />
     <ClCompile Include="..\src\builtin\files_com.cpp" />
     <ClCompile Include="..\src\builtin\fdisk_exe.cpp" />
     <ClCompile Include="..\src\builtin\find_exe.cpp" />
     <ClCompile Include="..\src\builtin\format_exe.cpp" />
+    <ClCompile Include="..\src\builtin\glide2x.cpp" />
     <ClCompile Include="..\src\builtin\hexmem16_exe.cpp" />
     <ClCompile Include="..\src\builtin\hexmem32_exe.cpp" />
     <ClCompile Include="..\src\builtin\lastdriv_com.cpp" />
     <ClCompile Include="..\src\builtin\mem_com.cpp" />
     <ClCompile Include="..\src\builtin\move_exe.cpp" />
+    <ClCompile Include="..\src\builtin\mpxplay.cpp" />
+    <ClCompile Include="..\src\builtin\ne2000bin.cpp" />
     <ClCompile Include="..\src\builtin\print_com.cpp" />
     <ClCompile Include="..\src\builtin\replace_exe.cpp" />
+    <ClCompile Include="..\src\builtin\shutdown.cpp" />
     <ClCompile Include="..\src\builtin\sort_exe.cpp" />
     <ClCompile Include="..\src\builtin\sys_com.cpp" />
+    <ClCompile Include="..\src\builtin\textutil.cpp" />
     <ClCompile Include="..\src\builtin\xcopy_exe.cpp" />
+    <ClCompile Include="..\src\builtin\zip.cpp" />
     <ClCompile Include="..\src\cpu\callback.cpp" />
     <ClCompile Include="..\src\cpu\core_dynrec.cpp" />
     <ClCompile Include="..\src\cpu\core_dyn_x86.cpp" />
@@ -1214,6 +1177,7 @@ for /d %%i in ($(SolutionDir)\..\contrib\translations\*) do copy %%i\*.lng "$(Ou
     <ClCompile Include="..\src\dos\drive_overlay.cpp" />
     <ClCompile Include="..\src\dos\drive_physfs.cpp" />
     <ClCompile Include="..\src\dos\drive_virtual.cpp" />
+    <ClCompile Include="..\src\dos\eltorito.cpp" />
     <ClCompile Include="..\src\fpu\fpu.cpp" />
     <ClCompile Include="..\src\gamelink\gamelink.cpp" />
     <ClCompile Include="..\src\gamelink\gamelink_term.cpp" />

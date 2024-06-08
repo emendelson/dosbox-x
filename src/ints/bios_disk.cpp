@@ -654,7 +654,7 @@ struct fatFromDOSDrive
 			}
 
 			struct SumInfo { uint64_t used_bytes; const StringToPointerHashMap<void>* filter; };
-			static void SumFileSize(const char* path, bool is_dir, uint32_t size, uint16_t, uint16_t, uint8_t, Bitu data)
+			static void SumFileSize(const char* path, bool /*is_dir*/, uint32_t size, uint16_t, uint16_t, uint8_t, Bitu data)
 			{
 				if (!((SumInfo*)data)->filter || !((SumInfo*)data)->filter->Get(path))
 					((SumInfo*)data)->used_bytes += (size + (32*1024-1)) / (32*1024) * (32*1024); // count as 32 kb clusters
@@ -1129,7 +1129,7 @@ static bool swapping_requested;
 
 void CMOS_SetRegister(Bitu regNr, uint8_t val); //For setting equipment word
 
-/* 2 floppys and 2 harddrives, max */
+/* 2 floppies and 2 harddrives, max */
 bool imageDiskChange[MAX_DISK_IMAGES]={false};
 imageDisk *imageDiskList[MAX_DISK_IMAGES]={NULL};
 imageDisk *diskSwap[MAX_SWAPPABLE_DISKS]={NULL};
@@ -1262,7 +1262,9 @@ bool getSwapRequest(void) {
 }
 
 void swapInDrive(int drive, unsigned int position=0) {
-    if (drive>1||swapInDisksSpecificDrive!=drive) return;
+#if 0  /* FIX_ME: Disabled to swap CD by IMGSWAP command (Issue #4932). Revert this if any regression occurs */
+    //if (drive>1||swapInDisksSpecificDrive!=drive) return;
+#endif
     if (position<1) swapPosition++;
     else swapPosition=position-1;
     if(diskSwap[swapPosition] == NULL) swapPosition = 0;
@@ -1816,9 +1818,17 @@ void IDE_EmuINT13DiskReadByBIOS_LBA(unsigned char disk,uint64_t lba);
 
 void diskio_delay(Bits value/*bytes*/, int type = -1);
 
+/* For El Torito "No emulation" INT 13 services */
+unsigned char INT13_ElTorito_NoEmuDriveNumber = 0;
+signed char INT13_ElTorito_IDEInterface = -1; /* (controller * 2) + (is_slave?1:0) */
+char INT13_ElTorito_NoEmuCDROMDrive = 0;
+
+bool GetMSCDEXDrive(unsigned char drive_letter, CDROM_Interface **_cdrom);
+
+
 static Bitu INT13_DiskHandler(void) {
     uint16_t segat, bufptr;
-    uint8_t sectbuf[512];
+    uint8_t sectbuf[2048/*CD-ROM support*/];
     uint8_t  drivenum;
     Bitu  i,t;
     last_drive = reg_dl;
@@ -2136,7 +2146,7 @@ static Bitu INT13_DiskHandler(void) {
             }
             CALLBACK_SCF(false);
         } else {
-            if (drivenum <DOS_DRIVES && (Drives[drivenum] != 0 || drivenum <2)) {
+            if (drivenum <DOS_DRIVES && (Drives[drivenum] || drivenum <2)) {
                 if (drivenum <2) {
                     //TODO use actual size (using 1.44 for now).
                     reg_ah = (int13_disk_change_detect_enable?2:1); // type
@@ -2215,6 +2225,37 @@ static Bitu INT13_DiskHandler(void) {
             CALLBACK_SCF(true);
             return CBRET_NONE;
         }
+        if (INT13_ElTorito_NoEmuDriveNumber != 0 && INT13_ElTorito_NoEmuDriveNumber == reg_dl) {
+                CDROM_Interface *src_drive = NULL;
+                if (!GetMSCDEXDrive(INT13_ElTorito_NoEmuCDROMDrive - 'A', &src_drive)) {
+                        reg_ah = 0x01;
+                        CALLBACK_SCF(true);
+                        return CBRET_NONE;
+                }
+
+                segat = dap.seg;
+                bufptr = dap.off;
+                for(i=0;i<dap.num;i++) {
+                        static_assert( sizeof(sectbuf) >= 2048, "not big enough" );
+                        diskio_delay(512);
+                        if (killRead || !src_drive->ReadSectorsHost(sectbuf, false, dap.sector+i, 1)) {
+                                real_writew(SegValue(ds),reg_si+2,i); // According to RBIL this should update the number of blocks field to what was successfully transferred
+                                LOG_MSG("Error in CDROM read");
+                                killRead = false;
+                                reg_ah = 0x04;
+                                CALLBACK_SCF(true);
+                                return CBRET_NONE;
+                        }
+
+                        for(t=0;t<2048;t++) {
+                                real_writeb(segat,bufptr,sectbuf[t]);
+                                bufptr++;
+                        }
+                }
+                reg_ah = 0x00;
+                CALLBACK_SCF(false);
+                return CBRET_NONE;
+        }
 
         if (!any_images) {
             // Inherit the Earth cdrom (uses it as disk test)
@@ -2243,6 +2284,7 @@ static Bitu INT13_DiskHandler(void) {
             IDE_EmuINT13DiskReadByBIOS_LBA(reg_dl,dap.sector+i);
 
             if((last_status != 0x00) || killRead) {
+                real_writew(SegValue(ds),reg_si+2,i); // According to RBIL this should update the number of blocks field to what was successfully transferred
                 LOG_MSG("Error in disk read");
                 killRead = false;
                 reg_ah = 0x04;
@@ -2342,6 +2384,45 @@ static Bitu INT13_DiskHandler(void) {
         reg_ah = 0x00;
         CALLBACK_SCF(false);
         } break;
+    case 0x4B: /* Terminate disk emulation or get emulation status */
+        /* NTS: Windows XP CD-ROM boot requires this call to work or else setup cannot find its own files. */
+        if (reg_dl == 0x7F || (INT13_ElTorito_NoEmuDriveNumber != 0 && INT13_ElTorito_NoEmuDriveNumber == reg_dl)) {
+            if (reg_al <= 1) {
+                PhysPt p = (SegValue(ds) << 4) + reg_si;
+                phys_writeb(p + 0x00,0x13);
+                phys_writeb(p + 0x01,(0/*no emulation*/) + ((INT13_ElTorito_IDEInterface >= 0) ? 0x40 : 0));
+                phys_writeb(p + 0x02,INT13_ElTorito_NoEmuDriveNumber);
+                if (INT13_ElTorito_IDEInterface >= 0) {
+                        phys_writeb(p + 0x03,(unsigned char)(INT13_ElTorito_IDEInterface >> 1)); /* which IDE controller */
+                        phys_writew(p + 0x08,INT13_ElTorito_IDEInterface & 1);/* bit 0: IDE master/slave */
+                }
+                else {
+                        phys_writeb(p + 0x03,0);
+                        phys_writew(p + 0x08,0);
+                }
+                phys_writed(p + 0x04,0);
+                phys_writew(p + 0x0A,0);
+                phys_writew(p + 0x0C,0);
+                phys_writew(p + 0x0E,0);
+                phys_writeb(p + 0x10,0);
+                phys_writeb(p + 0x11,0);
+                phys_writeb(p + 0x12,0);
+                reg_ah = 0x00;
+                CALLBACK_SCF(false);
+                break;
+            }
+            else {
+                reg_ah=0xff;
+                CALLBACK_SCF(true);
+                return CBRET_NONE;
+            }
+        }
+        else {
+            reg_ah=0xff;
+            CALLBACK_SCF(true);
+            return CBRET_NONE;
+        }
+        break;
     default:
         LOG(LOG_BIOS,LOG_ERROR)("INT13: Function %x called on drive %x (dos drive %d)", (int)reg_ah, (int)reg_dl, (int)drivenum);
         reg_ah=0xff;

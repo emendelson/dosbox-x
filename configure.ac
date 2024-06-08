@@ -123,8 +123,8 @@ AC_CHECK_HEADERS([sys/socket.h  netinet/in.h pwd.h], [], [],
 #endif
 ])
 
-dnl C++11 is mandatory in this codebase.
-dnl C++14 is optional at this time, will eventually become mandatory.
+dnl C++11 is deprecated in this codebase.
+dnl C++14 is recommended at this time, will eventually become mandatory.
 
 dnl AC_CHECK_CXXFLAGS will prepend gnu++11 to CXXFLAGS if supported, for us.
 OLDCFLAGS="$CFLAGS"
@@ -157,7 +157,7 @@ dnl Allow devs to force compile as C++11 as long as this code supports C++11 as 
 AC_ARG_ENABLE(force-cxx11,AC_HELP_STRING([--enable-force-cxx11],[Force compile as C++11]),force_cxx11=yes)
 
 if test x$warn_cpp11 = x1; then
-    AC_MSG_WARN([ Your compiler does not support C++14. Currently it is optional. At some point in the future, it will be required ])
+    AC_MSG_WARN([ Your compiler does not support C++14. Currently it is recommended. At some point in the future, it will be required ])
     CFLAGS="$CFLAGS -std=gnu11";
     CXXFLAGS="$CXXFLAGS -std=gnu++11";
 elif test x$force_cxx11 = xyes; then
@@ -379,12 +379,15 @@ AC_CHECK_CXXFLAGS([ -Wextra ])
 AC_CHECK_CXXFLAGS([ -Wunused ])
 AC_CHECK_CXXFLAGS([ -pedantic ])
 AC_CHECK_CXXFLAGS([ -Wno-error=format-security ])     # imfc.cpp and later versions of GCC, see https://github.com/joncampbell123/dosbox-x/issues/4436
+AC_CHECK_CXXFLAGS([ -Wno-error=incompatible-pointer-types ]) # required to compile speexdsp/fftwrap.c with GCC 14
 #AC_CHECK_CXXFLAGS([ -Wconversion ])      DO NOT ENABLE. THIS WARNING IS WAY TOO PEDANTIC TO BE USEFUL, EXCEPT FOR SPECIFIC CASES
 #AC_CHECK_CXXFLAGS([ -Wsign-conversion ])
 AC_CHECK_CXXFLAGS([ -Wlogical-op ])
 AC_CHECK_CXXFLAGS([ -Wsign-promo ])
 AC_CHECK_CXXFLAGS([ -Wconversion-null ])
 #AC_CHECK_CXXFLAGS([ -Woverloaded-virtual ])    NOT TOO USEFUL
+AC_CHECK_CXXFLAGS([ -Wsuggest-override ])
+AC_CHECK_CXXFLAGS([ -Wnon-virtual-dtor ])
 AC_CHECK_CXXFLAGS([ -Wno-deprecated-declarations ])
 
 dnl Let GCC 7.3.x know that the "fall through" switch cases in this codebase
@@ -629,6 +632,12 @@ case "$host_cpu" in
     c_targetcpu="m68k"
     c_unalignedmemory=yes
     ;;
+   loongarch64*)
+    AC_DEFINE(C_TARGETCPU,LOONGARCH64)
+    AC_MSG_RESULT(LoongArch)
+    c_targetcpu="loongarch64"
+    c_unalignedmemory=yes
+    ;;
    armv7*)
     AC_DEFINE(C_TARGETCPU,ARMV7LE)
     AC_MSG_RESULT(ARMv7 Little Endian)
@@ -867,6 +876,10 @@ if test x$enable_mt32 = xyes ; then
       AC_DEFINE(C_MT32,1)
       ;;
     aarch64)
+      AC_MSG_RESULT(yes)
+      AC_DEFINE(C_MT32,1)
+      ;;
+    loongarch64)
       AC_MSG_RESULT(yes)
       AC_DEFINE(C_MT32,1)
       ;;
@@ -1131,8 +1144,8 @@ if test x$enable_libslirp = xyes ; then
     have_slirp=yes
     AC_DEFINE(C_SLIRP,1)
     LIBS="$LIBS "`pkg-config slirp --libs`
-    CFLAGS="$CFLAGS "`pkg-config slirp --cflags`
-    CPPFLAGS="$CPPFLAGS "`pkg-config slirp --cflags`
+    CFLAGS="$CFLAGS -DLIBSLIRP_STATIC "`pkg-config slirp --cflags`
+    CPPFLAGS="$CPPFLAGS -DLIBSLIRP_STATIC "`pkg-config slirp --cflags`
     case "$host" in
       *-*-cygwin* | *-*-mingw32*)
          LIBS="$LIBS -lintl"

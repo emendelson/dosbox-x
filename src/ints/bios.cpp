@@ -75,6 +75,13 @@ extern bool PS1AudioCard;
 # define S_ISREG(x) ((x & S_IFREG) == S_IFREG)
 #endif
 
+unsigned char ACPI_ENABLE_CMD = 0xA1;
+unsigned char ACPI_DISABLE_CMD = 0xA0;
+unsigned int ACPI_IO_BASE = 0x820;
+unsigned int ACPI_PM1A_EVT_BLK = 0x820;
+unsigned int ACPI_PM1A_CNT_BLK = 0x824;
+unsigned int ACPI_PM_TMR_BLK = 0x830;
+
 std::string ibm_rom_basic;
 size_t ibm_rom_basic_size = 0;
 uint32_t ibm_rom_basic_base = 0;
@@ -183,6 +190,164 @@ RegionAllocTracking             rombios_alloc;
 Bitu                        rombios_minimum_location = 0xF0000; /* minimum segment allowed */
 Bitu                        rombios_minimum_size = 0x10000;
 
+static bool ACPI_SCI_EN = false;
+static bool ACPI_BM_RLD = false;
+
+static IO_Callout_t acpi_iocallout = IO_Callout_t_none;
+
+static unsigned int ACPI_PM1_Enable = 0;
+static unsigned int ACPI_PM1_Status = 0;
+static constexpr unsigned int ACPI_PM1_Enable_TMR_EN = (1u << 0u);
+static constexpr unsigned int ACPI_PM1_Enable_GBL_EN = (1u << 5u);
+static constexpr unsigned int ACPI_PM1_Enable_PWRBTN_EN = (1u << 8u);
+static constexpr unsigned int ACPI_PM1_Enable_SLPBTN_EN = (1u << 9u);
+static constexpr unsigned int ACPI_PM1_Enable_RTC_EN = (1u << 10u);
+
+unsigned int ACPI_buffer_global_lock = 0;
+
+unsigned long ACPI_FACS_GlobalLockValue(void) {
+	if (ACPI_buffer && ACPI_buffer_global_lock != 0)
+		return host_readd(ACPI_buffer+ACPI_buffer_global_lock);
+
+	return 0;
+}
+
+/* Triggered by GBL_RLS bit */
+static void ACPI_OnGuestGlobalRelease(void) {
+	LOG(LOG_MISC,LOG_DEBUG)("ACPI GBL_RLS event. Global lock = %lx",ACPI_FACS_GlobalLockValue());
+}
+
+bool ACPI_GuestEnabled(void) {
+	return ACPI_SCI_EN;
+}
+
+static void ACPI_SCI_Check(void) {
+	if (ACPI_SCI_EN) {
+		if (ACPI_PM1_Status & ACPI_PM1_Enable) {
+			LOG(LOG_MISC,LOG_DEBUG)("ACPI SCI interrupt");
+			PIC_ActivateIRQ(ACPI_IRQ);
+		}
+	}
+}
+
+void ACPI_PowerButtonEvent(void) {
+	if (ACPI_SCI_EN) {
+		ACPI_PM1_Status |= ACPI_PM1_Enable_PWRBTN_EN;
+		ACPI_SCI_Check();
+	}
+}
+
+static void acpi_cb_port_smi_cmd_w(Bitu /*port*/,Bitu val,Bitu /*iolen*/) {
+	/* 8-bit SMI_CMD port */
+	LOG(LOG_MISC,LOG_DEBUG)("ACPI SMI_CMD %x",(unsigned int)val);
+
+	if (val == ACPI_ENABLE_CMD) {
+		if (!ACPI_SCI_EN) {
+			LOG(LOG_MISC,LOG_DEBUG)("Guest enabled ACPI");
+			ACPI_SCI_EN = true;
+			ACPI_SCI_Check();
+		}
+	}
+	else if (val == ACPI_DISABLE_CMD) {
+		if (ACPI_SCI_EN) {
+			LOG(LOG_MISC,LOG_DEBUG)("Guest disabled ACPI");
+			ACPI_SCI_EN = false;
+		}
+	}
+}
+
+static Bitu acpi_cb_port_cnt_blk_r(Bitu port,Bitu /*iolen*/) {
+	/* 16-bit register (PM1_CNT_LEN == 2) */
+	Bitu ret = 0;
+	if (ACPI_SCI_EN) ret |= (1u << 0u);
+	if (ACPI_BM_RLD) ret |= (1u << 1u);
+	/* GBL_RLS is write only */
+	/* TODO: bits 3-8 are "reserved by the ACPI driver"? So are they writeable then? */
+	/* TODO: SLP_TYPx */
+	/* SLP_EN is write-only */
+
+	LOG(LOG_MISC,LOG_DEBUG)("ACPI_PM1_CNT_BLK read port %x ret %x",(unsigned int)port,(unsigned int)ret);
+	return ret;
+}
+
+static void acpi_cb_port_cnt_blk_w(Bitu port,Bitu val,Bitu iolen) {
+	/* 16-bit register (PM1_CNT_LEN == 2) */
+	LOG(LOG_MISC,LOG_DEBUG)("ACPI_PM1_CNT_BLK write port %x val %x iolen %x",(unsigned int)port,(unsigned int)val,(unsigned int)iolen);
+
+	/* BIOS controls SCI_EN and therefore guest cannot change it */
+	ACPI_BM_RLD = !!(val & (1u << 1u));
+	/* GLB_RLS is write only and triggers an SMI interrupt to pass execution to the BIOS, usually to indicate a release of the global lock and set of pending bit */
+	if (val & (1u << 2u)/*GBL_RLS*/) ACPI_OnGuestGlobalRelease();
+	/* TODO: bits 3-8 are "reserved by the ACPI driver"? So are they writeable then? */
+	/* TODO: SLP_TYPx */
+	/* SLP_EN is write-only */
+}
+
+static Bitu acpi_cb_port_evtst_blk_r(Bitu port,Bitu /*iolen*/) {
+	/* 16-bit register (PM1_EVT_LEN/2 == 2) */
+	Bitu ret = ACPI_PM1_Status;
+	LOG(LOG_MISC,LOG_DEBUG)("ACPI_PM1_EVT_BLK(status) read port %x ret %x",(unsigned int)port,(unsigned int)ret);
+	return ret;
+}
+
+static void acpi_cb_port_evtst_blk_w(Bitu port,Bitu val,Bitu iolen) {
+	/* 16-bit register (PM1_EVT_LEN/2 == 2) */
+	LOG(LOG_MISC,LOG_DEBUG)("ACPI_PM1_EVT_BLK(status) write port %x val %x iolen %x",(unsigned int)port,(unsigned int)val,(unsigned int)iolen);
+	ACPI_PM1_Status &= (~val);
+	ACPI_SCI_Check();
+}
+
+static Bitu acpi_cb_port_evten_blk_r(Bitu port,Bitu /*iolen*/) {
+	/* 16-bit register (PM1_EVT_LEN/2 == 2) */
+	Bitu ret = ACPI_PM1_Enable;
+	LOG(LOG_MISC,LOG_DEBUG)("ACPI_PM1_EVT_BLK(enable) read port %x ret %x",(unsigned int)port,(unsigned int)ret);
+	return ret;
+}
+
+static void acpi_cb_port_evten_blk_w(Bitu port,Bitu val,Bitu iolen) {
+	/* 16-bit register (PM1_EVT_LEN/2 == 2) */
+	LOG(LOG_MISC,LOG_DEBUG)("ACPI_PM1_EVT_BLK(enable) write port %x val %x iolen %x",(unsigned int)port,(unsigned int)val,(unsigned int)iolen);
+	ACPI_PM1_Enable = val;
+	ACPI_SCI_Check();
+}
+
+static IO_ReadHandler* acpi_cb_port_r(IO_CalloutObject &co,Bitu port,Bitu iolen) {
+	(void)co;
+	(void)iolen;
+
+	if ((port & (~1u)) == (ACPI_PM1A_EVT_BLK+0) && iolen >= 2)
+		return acpi_cb_port_evtst_blk_r;
+	else if ((port & (~1u)) == (ACPI_PM1A_EVT_BLK+2) && iolen >= 2)
+		return acpi_cb_port_evten_blk_r;
+	else if ((port & (~1u)) == ACPI_PM1A_CNT_BLK && iolen >= 2)
+		return acpi_cb_port_cnt_blk_r;
+	/* The ACPI specification says nothing about reading SMI_CMD so assume that means write only */
+	else if ((port & (~3u)) == ACPI_PM_TMR_BLK) {
+		LOG(LOG_MISC,LOG_DEBUG)("read ACPI_PM_TMR_BLK port=0x%x iolen=%u",(unsigned int)port,(unsigned int)iolen);
+	}
+
+	return NULL;
+}
+
+static IO_WriteHandler* acpi_cb_port_w(IO_CalloutObject &co,Bitu port,Bitu iolen) {
+	(void)co;
+	(void)iolen;
+
+	if ((port & (~1u)) == (ACPI_PM1A_EVT_BLK+0) && iolen >= 2)
+		return acpi_cb_port_evtst_blk_w;
+	else if ((port & (~1u)) == (ACPI_PM1A_EVT_BLK+2) && iolen >= 2)
+		return acpi_cb_port_evten_blk_w;
+	else if ((port & (~1u)) == ACPI_PM1A_CNT_BLK && iolen >= 2)
+		return acpi_cb_port_cnt_blk_w;
+	else if ((port & (~3u)) == ACPI_SMI_CMD)
+		return acpi_cb_port_smi_cmd_w;
+	else if ((port & (~3u)) == ACPI_PM_TMR_BLK) {
+		LOG(LOG_MISC,LOG_DEBUG)("write ACPI_PM_TMR_BLK port=0x%x iolen=%u",(unsigned int)port,(unsigned int)iolen);
+	}
+
+	return NULL;
+}
+
 bool MEM_map_ROM_physmem(Bitu start,Bitu end);
 bool MEM_unmap_physmem(Bitu start,Bitu end);
 
@@ -254,6 +419,9 @@ static Bitu APM_SuspendedLoopFunc(void) {
 bool PowerManagementEnabledButton() {
 	if (IS_PC98_ARCH) /* power management not yet known or implemented */
 		return false;
+
+	if (ACPI_GuestEnabled())
+		ACPI_PowerButtonEvent();
 
 	if (apm_realmode_connected) /* guest has connected to the APM BIOS */
 		return true;
@@ -3428,6 +3596,173 @@ static const uint8_t pc98_katakana6x8_font[] = {
 	0x20,0x10,0x40,0x20,0x00,0x00,0x00,0x00,0x00,0x20,0x50,0x20,0x00,0x00,0x00,0x00
 };
 
+unsigned char byte_reverse(unsigned char c);
+
+static void PC98_INT18_DrawShape(void)
+{
+	PhysPt ucw;
+	uint8_t type, dir;
+	uint16_t x1, y1;
+	uint16_t ead, dad;
+	uint16_t dc, d, d2, dm;
+
+	ucw = SegPhys(ds) + reg_bx;
+	type = mem_readb(ucw + 0x28);
+	dir = mem_readb(ucw + 0x03);
+	x1 = mem_readw(ucw + 0x08);
+	y1 = mem_readw(ucw + 0x0a);
+	if((reg_ch & 0xc0) == 0x40) {
+		y1 += 200;
+	}
+	ead = (y1 * 40) + (x1 >> 4);
+	dad = x1 % 16;
+	// line pattern
+	pc98_gdc[GDC_SLAVE].set_textw(((uint16_t)byte_reverse(mem_readb(ucw + 0x20)) << 8) | byte_reverse(mem_readb(ucw + 0x21)));
+	if(type == 0x04) {
+		// arc
+		dc = mem_readw(ucw + 0x0c);
+		d = mem_readw(ucw + 0x1c) - 1;
+		d2 = d >> 1;
+		dm = mem_readw(ucw + 0x1a);
+		if((reg_ch & 0x30) == 0x30) {
+			uint8_t plane = mem_readb(ucw + 0x00);
+			uint32_t offset = 0x4000;
+			for(uint8_t bit = 1 ; bit <= 4 ; bit <<= 1) {
+				pc98_gdc[GDC_SLAVE].set_mode((plane & bit) ? 0x03 : 0x02);
+				pc98_gdc[GDC_SLAVE].set_vectw(0x20, dir, dc, d, d2, 0x3fff, dm);
+				pc98_gdc[GDC_SLAVE].set_csrw(offset + ead, dad);
+				pc98_gdc[GDC_SLAVE].exec(0x6c);
+				offset += 0x4000;
+			}
+		} else {
+			pc98_gdc[GDC_SLAVE].set_mode(mem_readb(ucw + 0x02));
+			pc98_gdc[GDC_SLAVE].set_vectw(0x20, dir, dc, d, d2, 0x3fff, dm);
+			pc98_gdc[GDC_SLAVE].set_csrw(0x4000 + ((reg_ch & 0x30) << 10) + ead, dad);
+			pc98_gdc[GDC_SLAVE].exec(0x6c);
+		}
+	} else {
+		uint16_t x2, y2, temp;
+		x2 = mem_readw(ucw + 0x16);
+		y2 = mem_readw(ucw + 0x18);
+		if(type == 0x01) {
+			// line
+			if((reg_ch & 0x30) == 0x30) {
+				uint8_t plane = mem_readb(ucw + 0x00);
+				uint32_t offset = 0x4000;
+				for(uint8_t bit = 1 ; bit <= 4 ; bit <<= 1) {
+					pc98_gdc[GDC_SLAVE].set_mode((plane & bit) ? 0x03 : 0x02);
+					pc98_gdc[GDC_SLAVE].set_vectl(x1, y1, x2, y2);
+					pc98_gdc[GDC_SLAVE].set_csrw(offset + ead, dad);
+					pc98_gdc[GDC_SLAVE].exec(0x6c);
+					offset += 0x4000;
+				}
+			} else {
+				pc98_gdc[GDC_SLAVE].set_mode(mem_readb(ucw + 0x02));
+				pc98_gdc[GDC_SLAVE].set_vectl(x1, y1, x2, y2);
+				pc98_gdc[GDC_SLAVE].set_csrw(0x4000 + ((reg_ch & 0x30) << 10) + ead, dad);
+				pc98_gdc[GDC_SLAVE].exec(0x6c);
+			}
+		} else if(type == 0x02) {
+			// box
+			uint16_t dx, dy;
+			if(x1 > x2) {
+				temp = x2; x2 = x1; x1 = temp;
+			}
+			if(y1 > y2) {
+				temp = y2; y2 = y1; y1 = temp;
+			}
+			dx = x2 - x1;
+			dy = y2 - y1;
+			switch(dir & 3) {
+			case 0:
+				d = dy;
+				d2 = dx;
+				break;
+			case 1:
+				d2 = dx + dy;
+				d2 >>= 1;
+				d = dx - dy;
+				d = (d >> 1) & 0x3fff;
+				break;
+			case 2:
+				d = dx;
+				d2 = dy;
+				break;
+			case 3:
+				d2 = dx + dy;
+				d2 >>= 1;
+				d = dy - dx;
+				d = (d >> 1) & 0x3fff;
+				break;
+			}
+			if((reg_ch & 0x30) == 0x30) {
+				uint8_t plane = mem_readb(ucw + 0x00);
+				uint32_t offset = 0x4000;
+				for(uint8_t bit = 1 ; bit <= 4 ; bit <<= 1) {
+					pc98_gdc[GDC_SLAVE].set_mode((plane & bit) ? 0x03 : 0x02);
+					pc98_gdc[GDC_SLAVE].set_vectw(0x40, dir, 3, d, d2, 0xffff, d);
+					pc98_gdc[GDC_SLAVE].set_csrw(offset + ead, dad);
+					pc98_gdc[GDC_SLAVE].exec(0x6c);
+					offset += 0x4000;
+				}
+			} else {
+				pc98_gdc[GDC_SLAVE].set_mode(mem_readb(ucw + 0x02));
+				pc98_gdc[GDC_SLAVE].set_vectw(0x40, dir, 3, d, d2, 0xffff, d);
+				pc98_gdc[GDC_SLAVE].set_csrw(0x4000 + ((reg_ch & 0x30) << 10) + ead, dad);
+				pc98_gdc[GDC_SLAVE].exec(0x6c);
+			}
+		}
+	}
+}
+
+static void PC98_INT18_DrawText(void)
+{
+	PhysPt ucw;
+	uint8_t dir;
+	uint8_t tile[8];
+    uint16_t len;
+	uint16_t x1, y1;
+	uint16_t ead, dad;
+	uint16_t dc, d;
+
+	ucw = SegPhys(ds) + reg_bx;
+	for(uint8_t i = 0 ; i < 8 ; i++) {
+		tile[i] = byte_reverse(mem_readb(ucw + 0x20 + i));
+	}
+	pc98_gdc[GDC_SLAVE].set_textw(tile, 8);
+	len = mem_readw(ucw + 0x0c);
+	if(len > 0) {
+		d = len;
+		dc = (mem_readw(ucw + 0x1e) - 1) & 0x3fff;
+	} else {
+		d = 8;
+		dc = 7;
+	}
+	dir = mem_readb(ucw + 0x03);
+	x1 = mem_readw(ucw + 0x08);
+	y1 = mem_readw(ucw + 0x0a);
+	if((reg_ch & 0xc0) == 0x40) {
+		y1 += 200;
+	}
+	ead = (y1 * 40) + (x1 >> 4);
+	dad = x1 % 16;
+	if((reg_ch & 0x30) == 0x30) {
+		uint8_t plane = mem_readb(ucw + 0x00);
+		uint32_t offset = 0x4000;
+		for(uint8_t bit = 1 ; bit <= 4 ; bit <<= 1) {
+			pc98_gdc[GDC_SLAVE].set_mode((plane & bit) ? 0x03 : 0x02);
+			pc98_gdc[GDC_SLAVE].set_vectw(0x10, dir, dc, d, 0, 0, 0);
+			pc98_gdc[GDC_SLAVE].set_csrw(offset + ead, dad);
+			pc98_gdc[GDC_SLAVE].exec(0x68);
+			offset += 0x4000;
+		}
+	} else {
+		pc98_gdc[GDC_SLAVE].set_mode(mem_readb(ucw + 0x02));
+		pc98_gdc[GDC_SLAVE].set_vectw(0x10, dir, dc, d, 0, 0, 0);
+		pc98_gdc[GDC_SLAVE].set_csrw(0x4000 + ((reg_ch & 0x30) << 10) + ead, dad);
+       	pc98_gdc[GDC_SLAVE].exec(0x68);
+	}
+}
 
 /* TODO: The text and graphics code that talks to the GDC will need to be converted
  *       to CPU I/O read and write calls. I think the reason Windows 3.1's 16-color
@@ -4125,6 +4460,13 @@ static Bitu INT18_PC98_Handler(void) {
                 LOG_MSG("PC-98 INT 18 AH=43h CX=0x%04X DS=0x%04X", reg_cx, SegValue(ds));
                 break;
             }
+        case 0x47:	// Line, Box
+        case 0x48:	// Arc
+            PC98_INT18_DrawShape();
+            break;
+        case 0x49:	// Text
+            PC98_INT18_DrawText();
+            break;
         case 0x4D:  // 256-color enable
             if (reg_ch == 1) {
                 void pc98_port6A_command_write(unsigned char b);
@@ -4511,7 +4853,7 @@ void PC98_BIOS_FDC_CALL(unsigned int flags) {
                 FDC_WAIT_TIMER_HACK();
             }
 
-            /* Prevent reading 1.44MB floppyies using 1.2MB read commands and vice versa.
+            /* Prevent reading 1.44MB floppies using 1.2MB read commands and vice versa.
              * FIXME: It seems MS-DOS 5.0 booted from a HDI image has trouble understanding
              *        when Drive A: (the first floppy) is a 1.44MB drive or not and fails
              *        because it only attempts it using 1.2MB format read commands. */
@@ -4590,7 +4932,7 @@ void PC98_BIOS_FDC_CALL(unsigned int flags) {
                 FDC_WAIT_TIMER_HACK();
             }
 
-            /* Prevent reading 1.44MB floppyies using 1.2MB read commands and vice versa.
+            /* Prevent reading 1.44MB floppies using 1.2MB read commands and vice versa.
              * FIXME: It seems MS-DOS 5.0 booted from a HDI image has trouble understanding
              *        when Drive A: (the first floppy) is a 1.44MB drive or not and fails
              *        because it only attempts it using 1.2MB format read commands. */
@@ -5697,7 +6039,7 @@ static Bitu INT11_Handler(void) {
 #define DOSBOX_CLOCKSYNC 0
 #endif
 
-uint32_t BIOS_HostTimeSync(uint32_t ticks) {
+uint32_t BIOS_HostTimeSync(uint32_t /*ticks*/) {
 #if 0//DISABLED TEMPORARILY
     uint32_t milli = 0;
 #if defined(DB_HAVE_CLOCK_GETTIME) && ! defined(WIN32)
@@ -5929,20 +6271,20 @@ static Bitu INT17_Handler(void) {
 
     switch(reg_ah) {
     case 0x00:      // PRINTER: Write Character
-        if(parallelPortObjects[reg_dx]!=0) {
+        if(parallelPortObjects[reg_dx]) {
             if(parallelPortObjects[reg_dx]->Putchar(reg_al))
                 reg_ah=parallelPortObjects[reg_dx]->getPrinterStatus();
             else reg_ah=1;
         }
         break;
     case 0x01:      // PRINTER: Initialize port
-        if(parallelPortObjects[reg_dx]!= 0) {
+        if(parallelPortObjects[reg_dx]) {
             parallelPortObjects[reg_dx]->initialize();
             reg_ah=parallelPortObjects[reg_dx]->getPrinterStatus();
         }
         break;
     case 0x02:      // PRINTER: Get Status
-        if(parallelPortObjects[reg_dx] != 0)
+        if(parallelPortObjects[reg_dx])
             reg_ah=parallelPortObjects[reg_dx]->getPrinterStatus();
         //LOG_MSG("printer status: %x",reg_ah);
         break;
@@ -7955,6 +8297,1059 @@ static int bios_post_counter = 0;
 extern void BIOSKEY_PC98_Write_Tables(void);
 extern Bitu PC98_AVSDRV_PCM_Handler(void);
 
+static unsigned int acpiptr2ofs(unsigned char *w) {
+	return w - ACPI_buffer;
+}
+
+static PhysPt acpiofs2phys(unsigned int o) {
+	return ACPI_BASE + o;
+}
+
+class ACPISysDescTableWriter {
+public:
+	ACPISysDescTableWriter();
+	~ACPISysDescTableWriter(void);
+public:
+	ACPISysDescTableWriter &begin(unsigned char *w,unsigned char *f,size_t n_tablesize=36);
+	ACPISysDescTableWriter &setRev(const unsigned char rev);
+	ACPISysDescTableWriter &setOemID(const char *id);
+	ACPISysDescTableWriter &setSig(const char *sig);
+	ACPISysDescTableWriter &setOemTableID(const char *id);
+	ACPISysDescTableWriter &setOemRev(const uint32_t rev);
+	ACPISysDescTableWriter &setCreatorID(const uint32_t id);
+	ACPISysDescTableWriter &setCreatorRev(const uint32_t rev);
+	ACPISysDescTableWriter &expandto(size_t sz);
+	unsigned char* getptr(size_t ofs=0,size_t sz=1);
+	size_t get_tablesize(void) const;
+	unsigned char* finish(void);
+private:
+	size_t				tablesize = 0;
+	unsigned char*			base = NULL;
+	unsigned char*			f = NULL;
+};
+
+size_t ACPISysDescTableWriter::get_tablesize(void) const {
+	return tablesize;
+}
+
+ACPISysDescTableWriter::ACPISysDescTableWriter() {
+}
+
+ACPISysDescTableWriter::~ACPISysDescTableWriter(void) {
+	if (tablesize != 0) LOG(LOG_MISC,LOG_ERROR)("ACPI table writer destructor called without completing a table");
+}
+
+ACPISysDescTableWriter &ACPISysDescTableWriter::begin(unsigned char *n_w,unsigned char *n_f,size_t n_tablesize) {
+	if (tablesize != 0) LOG(LOG_MISC,LOG_ERROR)("ACPI table writer asked to begin a table without completing the last table");
+	base = n_w;
+	f = n_f;
+	tablesize = n_tablesize;
+	assert(tablesize >= 36);
+	assert((base+tablesize) <= f);
+	assert(base != NULL);
+	assert(f != NULL);
+	assert(base < f);
+
+	memset(base,0,tablesize);
+	memcpy(base+10,"DOSBOX",6); // OEM ID
+	memcpy(base+16,"DOSBox-X",8); // OEM Table ID
+	host_writed(base+24,1); // OEM revision
+	memcpy(base+28,"DBOX",4); // Creator ID
+	host_writed(base+32,1); // Creator revision
+
+	return *this;
+}
+
+ACPISysDescTableWriter &ACPISysDescTableWriter::setRev(const unsigned char rev) {
+	assert(base != NULL);
+	assert(tablesize >= 36);
+	base[8] = rev;
+	return *this;
+}
+
+ACPISysDescTableWriter &ACPISysDescTableWriter::setOemID(const char *id) {
+	assert(id != NULL);
+	assert(base != NULL);
+	assert(tablesize >= 36);
+	unsigned char *wp = base+10;
+	for (unsigned int i=0;i < 6;i++) {
+		if (*id != 0)
+			*wp++ = (unsigned char)(*id++);
+		else
+			*wp++ = ' ';
+	}
+	return *this;
+}
+
+ACPISysDescTableWriter &ACPISysDescTableWriter::setSig(const char *sig) {
+	assert(sig != NULL);
+	assert(base != NULL);
+	assert(tablesize >= 36);
+	unsigned char *wp = base;
+	for (unsigned int i=0;i < 4;i++) {
+		if (*sig != 0)
+			*wp++ = (unsigned char)(*sig++);
+		else
+			*wp++ = ' ';
+	}
+	return *this;
+}
+
+ACPISysDescTableWriter &ACPISysDescTableWriter::setOemTableID(const char *id) {
+	assert(id != NULL);
+	assert(base != NULL);
+	assert(tablesize >= 36);
+	unsigned char *wp = base+16;
+	for (unsigned int i=0;i < 8;i++) {
+		if (*id != 0)
+			*wp++ = (unsigned char)(*id++);
+		else
+			*wp++ = ' ';
+	}
+	return *this;
+}
+
+ACPISysDescTableWriter &ACPISysDescTableWriter::setOemRev(const uint32_t rev) {
+	assert(base != NULL);
+	assert(tablesize >= 36);
+	host_writed(base+24,rev);
+	return *this;
+}
+
+ACPISysDescTableWriter &ACPISysDescTableWriter::setCreatorID(const uint32_t id) {
+	assert(base != NULL);
+	assert(tablesize >= 36);
+	host_writed(base+28,id);
+	return *this;
+}
+
+ACPISysDescTableWriter &ACPISysDescTableWriter::setCreatorRev(const uint32_t rev) {
+	assert(base != NULL);
+	assert(tablesize >= 36);
+	host_writed(base+32,rev);
+	return *this;
+}
+
+ACPISysDescTableWriter &ACPISysDescTableWriter::expandto(size_t sz) {
+	assert(base != NULL);
+	assert((base+sz) <= f);
+	if (tablesize < sz) tablesize = sz;
+	return *this;
+}
+
+unsigned char* ACPISysDescTableWriter::getptr(size_t ofs,size_t sz) {
+	assert(base != NULL);
+	assert((base+ofs+sz) <= f);
+	if (tablesize < (ofs+sz)) tablesize = ofs+sz;
+	return base+ofs;
+}
+
+unsigned char *ACPISysDescTableWriter::finish(void) {
+	if (base != NULL) {
+		unsigned char *ret = base + tablesize;
+
+		assert((base+tablesize) <= f);
+		assert(tablesize >= 36);
+
+		/* update length field */
+		host_writed(base+4,tablesize);
+
+		/* update checksum field */
+		unsigned int i,c;
+		base[9] = 0;
+		c = 0; for (i=0;i < tablesize;i++) c += base[i];
+		base[9] = (0 - c) & 0xFFu;
+
+		base = f = NULL;
+		tablesize = 0;
+		return ret;
+	}
+
+	return NULL;
+}
+
+enum class ACPIRegionSpace {
+	SystemMemory=0,
+	SystemIO=1,
+	PCIConfig=2,
+	EmbeddedControl=3,
+	SMBus=4
+};
+
+namespace ACPIMethodFlags {
+	static constexpr unsigned char ArgCount(const unsigned c) {
+		return c&3u;
+	}
+	enum {
+		NotSerialized=(0 << 3),
+		Serialized=(1 << 3)
+	};
+}
+
+namespace ACPIFieldFlag {
+	namespace AccessType {
+		enum {
+			AnyAcc=0,
+			ByteAcc=1,
+			WordAcc=2,
+			DwordAcc=3,
+			BlockAcc=4,
+			SMBSendRevAcc=5,
+			SMBQuickAcc=6
+		};
+	}
+	namespace LockRule {
+		enum {
+			NoLock=(0 << 4),
+			Lock=(1 << 4)
+		};
+	}
+	namespace UpdateRule {
+		enum {
+			Preserve=(0 << 5),
+			WriteAsOnes=(1 << 5),
+			WriteAsZeros=(2 << 5)
+		};
+	}
+}
+
+enum class ACPIAMLOpcode:unsigned char {
+	ZeroOp = 0x00, // ACPI 1.0+
+	OneOp = 0x01, // ACPI 1.0+
+
+	AliasOp = 0x06, // ACPI 1.0+
+
+	NameOp = 0x08, // ACPI 1.0+
+
+	BytePrefix = 0x0A, // ACPI 1.0+
+	WordPrefix = 0x0B, // ACPI 1.0+
+	DwordPrefix = 0x0C, // ACPI 1.0+
+	StringPrefix = 0x0D, // ACPI 1.0+
+	QWordPrefix = 0x0E, // ACPI 2.0+
+
+	ScopeOp = 0x10, // ACPI 1.0+
+	BufferOP = 0x11, // ACPI 1.0+
+	PackageOp = 0x12, // ACPI 1.0+
+	VarPackageOp = 0x13, // ACPI 2.0+
+	MethodOp = 0x14, // ACPI 1.0+
+	ExternalOp = 0x15, // ACPI 6.0+
+
+	DualNamePrefix = 0x2E, // ACPI 1.0+
+	MultiNamePrefix = 0x2F, // ACPI 1.0+
+
+	NameCharA = 0x41, // ACPI 1.0b+
+	NameCharB = 0x42, // ACPI 1.0b+
+	NameCharC = 0x43, // ACPI 1.0b+
+	NameCharD = 0x44, // ACPI 1.0b+
+	NameCharE = 0x45, // ACPI 1.0b+
+	NameCharF = 0x46, // ACPI 1.0b+
+	NameCharG = 0x47, // ACPI 1.0b+
+	NameCharH = 0x48, // ACPI 1.0b+
+	NameCharI = 0x49, // ACPI 1.0b+
+	NameCharJ = 0x4A, // ACPI 1.0b+
+	NameCharK = 0x4B, // ACPI 1.0b+
+	NameCharL = 0x4C, // ACPI 1.0b+
+	NameCharM = 0x4D, // ACPI 1.0b+
+	NameCharN = 0x4E, // ACPI 1.0b+
+	NameCharO = 0x4F, // ACPI 1.0b+
+	NameCharP = 0x50, // ACPI 1.0b+
+	NameCharQ = 0x51, // ACPI 1.0b+
+	NameCharR = 0x52, // ACPI 1.0b+
+	NameCharS = 0x53, // ACPI 1.0b+
+	NameCharT = 0x54, // ACPI 1.0b+
+	NameCharU = 0x55, // ACPI 1.0b+
+	NameCharV = 0x56, // ACPI 1.0b+
+	NameCharW = 0x57, // ACPI 1.0b+
+	NameCharX = 0x58, // ACPI 1.0b+
+	NameCharY = 0x59, // ACPI 1.0b+
+	NameCharZ = 0x5A, // ACPI 1.0b+
+
+	ExtendedOperatorPrefix = 0x5B, // ACPI 1.0+
+	RootNamePrefix = 0x5C, // ACPI 1.0+
+
+	ParentNamePrefix = 0x5E, // ACPI 1.0+
+	NameChar_ = 0x5F, // ACPI 2.0+
+
+	Local0 = 0x60, // ACPI 1.0+
+	Local1 = 0x61, // ACPI 1.0+
+	Local2 = 0x62, // ACPI 1.0+
+	Local3 = 0x63, // ACPI 1.0+
+	Local4 = 0x64, // ACPI 1.0+
+	Local5 = 0x65, // ACPI 1.0+
+	Local6 = 0x66, // ACPI 1.0+
+	Local7 = 0x67, // ACPI 1.0+
+	Arg0 = 0x68, // ACPI 1.0+
+	Arg1 = 0x69, // ACPI 1.0+
+	Arg2 = 0x6A, // ACPI 1.0+
+	Arg3 = 0x6B, // ACPI 1.0+
+	Arg4 = 0x6C, // ACPI 1.0+
+	Arg5 = 0x6D, // ACPI 1.0+
+	Arg6 = 0x6E, // ACPI 1.0+
+
+	StoreOp = 0x70, // ACPI 1.0+
+	RefOfOp = 0x71, // ACPI 1.0+
+	AddOp = 0x72, // ACPI 1.0+
+	ConcatOp = 0x73, // ACPI 1.0+
+	SubtractOp = 0x74, // ACPI 1.0+
+	IncrementOp = 0x75, // ACPI 1.0+
+	DecrementOp = 0x76, // ACPI 1.0+
+	MultiplyOp = 0x77, // ACPI 1.0+
+	DivideOp = 0x78, // ACPI 1.0+
+	ShiftLeftOp = 0x79, // ACPI 1.0+
+	ShiftRightOp = 0x7A, // ACPI 1.0+
+	AndOp = 0x7B, // ACPI 1.0+
+	NAndOp = 0x7C, // ACPI 1.0+
+	OrOp = 0x7D, // ACPI 1.0+
+	NOrOp = 0x7E, // ACPI 1.0+
+	XOrOp = 0x7F, // ACPI 1.0+
+	NotOp = 0x80, // ACPI 1.0+
+	FindSetLeftBitOp = 0x81, // ACPI 1.0+
+	FindSetRightBitOp = 0x82, // ACPI 1.0+
+	DerefOfOp = 0x83, // ACPI 2.0+
+	ConcatResOp = 0x84, // ACPI 2.0+
+	ModOp = 0x85, // ACPI 2.0+
+	NotifyOp = 0x86, // ACPI 1.0+
+	SizeOfOp = 0x87, // ACPI 1.0+
+	IndexOp = 0x88, // ACPI 1.0+
+	MatchOp = 0x89, // ACPI 1.0+
+	DWordFieldOp = 0x8A, // ACPI 1.0+
+	CreateDWordFieldOp = 0x8A, // ACPI 1.0b+
+	WordFieldOp = 0x8B, // ACPI 1.0+
+	CreateWordFieldOp = 0x8B, // ACPI 1.0b+
+	ByteFieldOp = 0x8C, // ACPI 1.0+
+	CreateByteFieldOp = 0x8C, // ACPI 1.0b+
+	BitFieldOp = 0x8D, // ACPI 1.0+
+	CreateBitFieldOp = 0x8D, // ACPI 1.0b+
+	ObjTypeOp = 0x8E, // ACPI 1.0+
+	CreateQWordField = 0x8F, // ACPI 2.0+
+	LAndOp = 0x90, // ACPI 1.0+
+	LOrOp = 0x91, // ACPI 1.0+
+	LNotOp = 0x92, // ACPI 1.0+
+	LEQOp = 0x93, // ACPI 1.0+
+	LEqualOp = 0x93, // ACPI 1.0b+ same as LEQOp obviously to make opcode name clearer
+/*	LNotEQOp = 0x93 0x92 */ // ACPI 1.0, seems to be an error in the documentation as that is LEqualOp LNotOp which doesn't make sense
+/*	LNotEqualOp = 0x92 0x93 */ // ACPI 1.0b+, correction of opcode and to make opcode name clearer. Literally LNotOp LEqualOp
+	LGOp = 0x94, // ACPI 1.0+
+	LGreaterOp = 0x94, // ACPI 1.0b+ same as LGOp obviously to make opcode name clearer
+/*	LLEQOp = 0x94 0x92 */ // ACPI 1.0, seems to be an error in the documentation as that is LEqualOp LNotOp which doesn't make sense
+/*	LLessEqualOp = 0x92 0x94 */ // ACPI 1.0b+, correction of opcode and to make opcode name clearer. Literally LNotOp LGreaterOp
+	LLOp = 0x95, // ACPI 1.0+
+	LLessOp = 0x95, // ACPI 1.0b+ same as LLOp obviously to make opcode name clearer
+/*	LGEQOp = 0x95 0x92 */ // ACPI 1.0, seems to be an error in the documentation as that is LEqualOp LNotOp which doesn't make sense
+/*	LGreaterEqualOp = 0x95 0x92 */
+	// ^ ACPI 1.0b+, um... they kept the same mistake, but does make opcode name clearer, but the definition does correctly say LNotOp LLessOp.
+	// ^ Um... in fact ACPI 2.0 keeps the mistake and the corrected definition! They didn't fix THAT error until ACPI 3.0!
+	// ^ Would mistakes like this have anything to do with the Linux kernel reportedly not wanting to support any ACPI BIOS made before the year 2000?
+/*	LGreaterEqualOp = 0x92 0x95 */ // ACPI 3.0+ corrected byte pattern. Literally LNotOp LLessOp
+	BuffOp = 0x96, // ACPI 2.0+
+	ToBufferOp = 0x96, // ACPI 2.0a+, correction of opcode and to make opcode name clearer
+	DecStrOp = 0x97, // ACPI 2.0+
+	ToDecimalStringOp = 0x97, // ACPI 2.0a+, correction of opcode and to make opcode name clearer
+	HexStrOp = 0x98, // ACPI 2.0+
+	ToHexStringOp = 0x98, // ACPI 2.0a+, correction of opcode and to make opcode name clearer
+	IntOp = 0x99, // ACPI 2.0+
+	ToIntegerOp = 0x99, // ACPI 2.0a+, correction of opcode and to make opcode name clearer
+
+	StringOp = 0x9C, // ACPI 2.0+
+	ToStringOp = 0x9C, // ACPI 2.0a+, correction of opcode and to make opcode name clearer
+	CopyOp = 0x9D, // ACPI 2.0+
+	CopyObjectOp = 0x9D, // ACPI 2.0a+, correction of opcode and to make opcode name clearer
+	MidOp = 0x9E, // ACPI 2.0+
+	ContinueOp = 0x9F, // ACPI 2.0+
+	IfOp = 0xA0, // ACPI 1.0+
+	ElseOp = 0xA1, // ACPI 1.0+
+	WhileOp = 0xA2, // ACPI 1.0+
+	NoOp = 0xA3, // ACPI 1.0+
+	ReturnOp = 0xA4, // ACPI 1.0+
+	BreakOp = 0xA5, // ACPI 1.0+
+
+	BreakPointOp = 0xCC, // ACPI 1.0+
+
+	OnesOp = 0xFF // ACPI 1.0+
+};
+
+enum class ACPIAMLOpcodeEOP5B:unsigned char {
+	/*0x5B*/MutexOp = 0x01, // ACPI 1.0+
+	/*0x5B*/EventOp = 0x02, // ACPI 1.0+
+
+	/*0x5B*/ShiftRightBitOp = 0x10, // ACPI 1.0 only, disappeared 1.0b
+	/*0x5B*/ShiftLeftBitOp = 0x11, // ACPI 1.0 only, disappeared 1.0b
+	/*0x5B*/CondRefOp = 0x12, // ACPI 1.0+
+	/*0x5B*/CreateFieldOp = 0x13, // ACPI 1.0+
+
+	/*0x5B*/LocalTableOp = 0x1F, // ACPI 2.0+
+	/*0x5B*/LoadOp = 0x20, // ACPI 1.0+
+	/*0x5B*/StallOp = 0x21, // ACPI 1.0+
+	/*0x5B*/SleepOp = 0x22, // ACPI 1.0+
+	/*0x5B*/AcquireOp = 0x23, // ACPI 1.0+
+	/*0x5B*/SignalOp = 0x24, // ACPI 1.0+
+	/*0x5B*/WaitOp = 0x25, // ACPI 1.0+
+	/*0x5B*/ResetOp = 0x26, // ACPI 1.0+
+	/*0x5B*/ReleaseOp = 0x27, // ACPI 1.0+
+	/*0x5B*/FromBCDOp = 0x28, // ACPI 1.0+
+	/*0x5B*/ToBCD = 0x29, // ACPI 1.0+
+	/*0x5B*/UnloadOp = 0x2A, // ACPI 1.0+
+
+	/*0x5B*/RevisionOp = 0x30, // ACPI 1.0b+
+	/*0x5B*/DebugOp = 0x31, // ACPI 1.0+
+	/*0x5B*/FatalOp = 0x32, // ACPI 1.0+
+	/*0x5B*/TimerOp = 0x33, // ACPI 3.0+
+
+	/*0x5B*/OpRegionOp = 0x80, // ACPI 1.0+
+	/*0x5B*/FieldOp = 0x81, // ACPI 1.0+
+	/*0x5B*/DeviceOp = 0x82, // ACPI 1.0+
+	/*0x5B*/ProcessorOp = 0x83, // ACPI 1.0+
+	/*0x5B*/PowerResOp = 0x84, // ACPI 1.0+
+	/*0x5B*/ThermalZoneOp = 0x85, // ACPI 1.0+
+	/*0x5B*/IndexFieldOp = 0x86, // ACPI 1.0+
+	/*0x5B*/BankFieldOp = 0x87, // ACPI 1.0+
+	/*0x5B*/DataRegionOp = 0x88 // ACPI 2.0+
+};
+
+#include <stack>
+
+/* ACPI AML (ACPI Machine Language) writer.
+ * See also ACPI Specification 1.0b [http://hackipedia.org/browse.cgi/Computer/Platform/PC%2c%20IBM%20compatible/BIOS/ACPI%2c%20Advanced%20Configuration%20and%20Power%20Interface/Advanced%20Configuration%20and%20Power%20Interface%20Specification%20%281999%2d02%2d02%29%20v1%2e0b%2epdf].
+ *
+ * WARNING: The 1.0 specification [http://hackipedia.org/browse.cgi/Computer/Platform/PC%2c%20IBM%20compatible/BIOS/ACPI%2c%20Advanced%20Configuration%20and%20Power%20Interface/Advanced%20Configuration%20and%20Power%20Interface%20Specification%20%281996%2d12%2d22%29%20v1%2e0%2epdf] seems to have some mistakes in a few opcodes in how they are defined, which probably means if your BIOS is from 1996-1998 it might have those few erroneous AML opcodes. */
+class ACPIAMLWriter {
+	public:
+		static constexpr unsigned int MaxPkgSize = 0xFFFFFFFu;
+	public:
+		struct pkg_t {
+			unsigned char*	pkg_len = NULL;
+			unsigned char*	pkg_data = NULL;
+			unsigned int	element_count = 0;
+		};
+		std::stack<pkg_t> pkg_stack;
+	public:
+		ACPIAMLWriter();
+		~ACPIAMLWriter();
+	public:
+		unsigned char* writeptr(void) const;
+		void begin(unsigned char *n_w,unsigned char *n_f);
+	public:
+		ACPIAMLWriter &NameOp(const char *name);
+		ACPIAMLWriter &ByteOp(const unsigned char v);
+		ACPIAMLWriter &WordOp(const unsigned int v);
+		ACPIAMLWriter &DwordOp(const unsigned long v);
+		ACPIAMLWriter &StringOp(const char *str);
+		ACPIAMLWriter &OpRegionOp(const char *name,const ACPIRegionSpace regionspace);
+		ACPIAMLWriter &FieldOp(const char *name,const unsigned int pred_size,const unsigned int fieldflag);
+		ACPIAMLWriter &FieldOpEnd(void);
+		ACPIAMLWriter &ScopeOp(const char *name,const unsigned int pred_size=MaxPkgSize);
+		ACPIAMLWriter &ScopeOpEnd(void);
+		ACPIAMLWriter &PackageOp(const unsigned int pred_size=MaxPkgSize);
+		ACPIAMLWriter &PackageOpEnd(void);
+		ACPIAMLWriter &NothingOp(void);
+		ACPIAMLWriter &ZeroOp(void);
+		ACPIAMLWriter &OneOp(void);
+		ACPIAMLWriter &AliasOp(const char *what,const char *to_what);
+		ACPIAMLWriter &BufferOp(const unsigned char *data,const size_t datalen);
+		ACPIAMLWriter &DeviceOp(const char *name,const unsigned int pred_size=MaxPkgSize);
+		ACPIAMLWriter &DeviceOpEnd(void);
+		ACPIAMLWriter &MethodOp(const char *name,const unsigned int pred_size,const unsigned int methodflags);
+		ACPIAMLWriter &MethodOpEnd(void);
+		ACPIAMLWriter &ReturnOp(void);
+		ACPIAMLWriter &IfOp(const unsigned int pred_size=MaxPkgSize);
+		ACPIAMLWriter &IfOpEnd(void);
+		ACPIAMLWriter &ElseOp(const unsigned int pred_size=MaxPkgSize);
+		ACPIAMLWriter &ElseOpEnd(void);
+		ACPIAMLWriter &LEqualOp(void);
+		ACPIAMLWriter &LNotEqualOp(void);
+		ACPIAMLWriter &LNotOp(void);
+		ACPIAMLWriter &LAndOp(void);
+		ACPIAMLWriter &AndOp(void);
+		ACPIAMLWriter &ArgOp(const unsigned int arg); /* Arg0 through Arg6 */
+		ACPIAMLWriter &LocalOp(const unsigned int l); /* Local0 through Local7 */
+		ACPIAMLWriter &StoreOp(void);
+		ACPIAMLWriter &NOrOp(void);
+		ACPIAMLWriter &OrOp(void);
+		ACPIAMLWriter &NAndOp(void);
+	public:// ONLY for writing fields!
+		ACPIAMLWriter &FieldOpElement(const char *name,const unsigned int bits);
+	public:
+		ACPIAMLWriter &PkgLength(const unsigned int len,unsigned char* &wp,const unsigned int minlen=1);
+		ACPIAMLWriter &PkgLength(const unsigned int len,const unsigned int minlen=1);
+		ACPIAMLWriter &Name(const char *name);
+		ACPIAMLWriter &BeginPkg(const unsigned int pred_length=MaxPkgSize);
+		ACPIAMLWriter &EndPkg(void);
+		ACPIAMLWriter &CountElement(void);
+	private:
+		unsigned char*		w=NULL,*f=NULL;
+};
+
+/* StoreOp Operand Supername: Store Operand into Supername */
+ACPIAMLWriter &ACPIAMLWriter::StoreOp(void) {
+	*w++ = 0x70;
+	return *this;
+}
+
+ACPIAMLWriter &ACPIAMLWriter::LocalOp(const unsigned int l) {
+	if (l <= 7)
+		*w++ = 0x60 + l; /* 0x60..0x67 -> Local0..Local7 */
+	else
+		E_Exit("ACPI AML writer LocalOp out of range");
+
+	return *this;
+}
+
+ACPIAMLWriter &ACPIAMLWriter::ArgOp(const unsigned int arg) {
+	if (arg <= 6)
+		*w++ = 0x68 + arg; /* 0x68..0x6E -> Arg0..Arg6 */
+	else
+		E_Exit("ACPI AML writer ArgOp out of range");
+
+	return *this;
+}
+
+/* Binary operators like And and Xor are Operand1 Operand2 Target, and the return value
+ * of the operator is the result. What the ACPI specification is very unclear about, but
+ * hints at from a sample bit of ASL concerning PowerResource(), is that if you just
+ * want to evaluate the operator and do not care to store the result anywhere you can just
+ * set Target to Zero.
+ *
+ * This example doesn't make sense unless you consider that this is how you encode "Nothing"
+ * in the example on that page in spec 1.0b:
+ *
+ * Method(_STA) {
+ *   Return (Xor (GIO.IDEI, One, Zero)) // inverse of isolation
+ * }
+ *
+ * See what they did there? */
+ACPIAMLWriter &ACPIAMLWriter::NothingOp(void) {
+	ZeroOp();
+	return *this;
+}
+
+ACPIAMLWriter &ACPIAMLWriter::ZeroOp(void) {
+	*w++ = 0x00;
+	return *this;
+}
+
+ACPIAMLWriter &ACPIAMLWriter::OneOp(void) {
+	*w++ = 0x01;
+	return *this;
+}
+
+/* LEqual Operand1 Operand2 */
+ACPIAMLWriter &ACPIAMLWriter::LEqualOp(void) {
+	*w++ = 0x93;
+	return *this;
+}
+
+ACPIAMLWriter &ACPIAMLWriter::LNotOp(void) {
+	*w++ = 0x92;
+	return *this;
+}
+
+/* LAndOp Operand1 Operand2 == Operand1 && Operand2 */
+ACPIAMLWriter &ACPIAMLWriter::LAndOp(void) {
+	*w++ = 0x90;
+	return *this;
+}
+
+/* NAndOp Operand1 Operand2 Target -> Target = Operand1 & Operand2 */
+ACPIAMLWriter &ACPIAMLWriter::NAndOp(void) {
+	*w++ = 0x7C;
+	return *this;
+}
+
+/* AndOp Operand1 Operand2 Target -> Target = Operand1 & Operand2 */
+ACPIAMLWriter &ACPIAMLWriter::AndOp(void) {
+	*w++ = 0x7B;
+	return *this;
+}
+
+/* NOrOp Operand1 Operand2 Target -> Target = Operand1 & Operand2 */
+ACPIAMLWriter &ACPIAMLWriter::NOrOp(void) {
+	*w++ = 0x7E;
+	return *this;
+}
+
+/* OrOp Operand1 Operand2 Target -> Target = Operand1 & Operand2 */
+ACPIAMLWriter &ACPIAMLWriter::OrOp(void) {
+	*w++ = 0x7D;
+	return *this;
+}
+
+/* This makes sense if you think of an AML interpreter as something which encounters a LNotOp()
+ * and then runs the interpreter to parse the following token(s) to evaluate an int so it can
+ * do a logical NOT on the result of the evaluation. In other words this isn't like x86 assembly
+ * which you follow instruction by instruction but more like how you parse and evaluate expressions
+ * such as "4+5*3" properly. */
+ACPIAMLWriter &ACPIAMLWriter::LNotEqualOp(void) {
+	LNotOp();
+	LEqualOp();
+	return *this;
+}
+
+ACPIAMLWriter &ACPIAMLWriter::BufferOp(const unsigned char *data,const size_t datalen) {
+	/* Notice this OP was obviously invented by the Department of Redundant Redundancy somewhere deep within Microsoft.
+	 * This op stores both a PkgLength containing the overall buffer data and then the first bytes are a ByteOp encoding the length of the buffer.
+	 * So basically it stores the length twice. What? Why? */
+	*w++ = 0x11;
+	BeginPkg(datalen+8/*Byte/Word/DwordOp*/);
+	if (datalen >= 0x10000) DwordOp(datalen);
+	else if (datalen >= 0x100) WordOp(datalen);
+	else ByteOp(datalen);
+	if (datalen > 0) {
+		memcpy(w,data,datalen);
+		w += datalen;
+	}
+	EndPkg();
+	return *this;
+}
+
+ACPIAMLWriter &ACPIAMLWriter::AliasOp(const char *what,const char *to_what) {
+	*w++ = 0x06;
+	Name(what);
+	Name(to_what);
+	return *this;
+}
+
+ACPIAMLWriter &ACPIAMLWriter::ReturnOp(void) {
+	*w++ = 0xA4;
+	return *this;
+}
+
+ACPIAMLWriter &ACPIAMLWriter::IfOp(const unsigned int pred_size) {
+	*w++ = 0xA0;
+	BeginPkg(pred_size);
+	return *this;
+}
+
+ACPIAMLWriter &ACPIAMLWriter::IfOpEnd(void) {
+	EndPkg();
+	return *this;
+}
+
+ACPIAMLWriter &ACPIAMLWriter::ElseOp(const unsigned int pred_size) {
+	*w++ = 0xA1;
+	BeginPkg(pred_size);
+	return *this;
+}
+
+ACPIAMLWriter &ACPIAMLWriter::ElseOpEnd(void) {
+	EndPkg();
+	return *this;
+}
+
+ACPIAMLWriter &ACPIAMLWriter::NameOp(const char *name) {
+	*w++ = 0x08; // NameOp
+	Name(name);
+	return *this;
+}
+
+ACPIAMLWriter &ACPIAMLWriter::Name(const char *name) {
+	for (unsigned int i=0;i < 4;i++) {
+		if (*name) *w++ = *name++;
+		else *w++ = '_';
+	}
+
+	return *this;
+}
+
+ACPIAMLWriter &ACPIAMLWriter::ByteOp(const unsigned char v) {
+	*w++ = 0x0A; // ByteOp
+	*w++ = v;
+	return *this;
+}
+
+ACPIAMLWriter &ACPIAMLWriter::WordOp(const unsigned int v) {
+	*w++ = 0x0B; // WordOp
+	host_writew(w,v); w += 2;
+	return *this;
+}
+
+ACPIAMLWriter &ACPIAMLWriter::DwordOp(const unsigned long v) {
+	*w++ = 0x0C; // DwordOp
+	host_writed(w,v); w += 4;
+	return *this;
+}
+
+ACPIAMLWriter &ACPIAMLWriter::StringOp(const char *str) {
+	/* WARNING: Strings are only supposed to have ASCII 0x01-0x7F */
+	*w++ = 0x0D; // StringOp
+	while (*str != 0) *w++ = *str++;
+	*w++ = 0x00;
+	return *this;
+}
+
+ACPIAMLWriter &ACPIAMLWriter::OpRegionOp(const char *name,const ACPIRegionSpace regionspace) {
+	*w++ = 0x5B;
+	*w++ = 0x80;
+	Name(name);
+	*w++ = (unsigned char)regionspace;
+	// and then the caller must write the RegionAddress and RegionLength
+	return *this;
+}
+
+ACPIAMLWriter &ACPIAMLWriter::DeviceOp(const char *name,const unsigned int pred_size) {
+	*w++ = 0x5B;
+	*w++ = 0x82;
+	BeginPkg(pred_size);
+	Name(name);
+	return *this;
+}
+
+ACPIAMLWriter &ACPIAMLWriter::DeviceOpEnd(void) {
+	EndPkg();
+	return *this;
+}
+
+ACPIAMLWriter &ACPIAMLWriter::MethodOp(const char *name,const unsigned int pred_size,const unsigned int methodflags) {
+	*w++ = 0x14;
+	BeginPkg(pred_size);
+	Name(name);
+	*w++ = (unsigned char)methodflags;
+	return *this;
+}
+
+ACPIAMLWriter &ACPIAMLWriter::MethodOpEnd(void) {
+	EndPkg();
+	return *this;
+}
+
+ACPIAMLWriter &ACPIAMLWriter::FieldOp(const char *name,const unsigned int pred_size,const unsigned int fieldflag) {
+	*w++ = 0x5B;
+	*w++ = 0x81;
+	BeginPkg(pred_size);
+	Name(name);
+	*w++ = fieldflag;
+	return *this;
+}
+
+ACPIAMLWriter &ACPIAMLWriter::FieldOpEnd(void) {
+	EndPkg();
+	return *this;
+}
+
+ACPIAMLWriter &ACPIAMLWriter::ScopeOp(const char *name,const unsigned int pred_size) {
+	*w++ = 0x10;
+	BeginPkg(pred_size);
+	Name(name);
+	return *this;
+}
+
+ACPIAMLWriter &ACPIAMLWriter::ScopeOpEnd(void) {
+	EndPkg();
+	return *this;
+}
+
+ACPIAMLWriter &ACPIAMLWriter::PackageOp(const unsigned int pred_size) {
+	*w++ = 0x12;
+	BeginPkg(pred_size);
+	*w++ = 0x00; // placeholder for element count
+	return *this;
+}
+
+ACPIAMLWriter &ACPIAMLWriter::PackageOpEnd(void) {
+	assert(!pkg_stack.empty());
+
+	pkg_t &ent = pkg_stack.top();
+
+	if (ent.element_count > 255u) E_Exit("ACPI AML writer too many elements in package");
+	*ent.pkg_data = ent.element_count; /* element count follows PkgLength */
+
+	EndPkg();
+	return *this;
+}
+
+ACPIAMLWriter &ACPIAMLWriter::PkgLength(const unsigned int len,const unsigned int minlen) {
+	return PkgLength(len,w,minlen);
+}
+
+ACPIAMLWriter &ACPIAMLWriter::PkgLength(const unsigned int len,unsigned char* &wp,const unsigned int minlen) {
+	if (len >= 0x10000000 || minlen > 4) {
+		E_Exit("ACPI AML writer PkgLength value too large");
+	}
+	else if (len >= 0x100000 || minlen >= 4) {
+		*wp++ = (unsigned char)( len        & 0x0F) | 0xC0;
+		*wp++ = (unsigned char)((len >>  4) & 0xFF);
+		*wp++ = (unsigned char)((len >> 12) & 0xFF);
+		*wp++ = (unsigned char)((len >> 20) & 0xFF);
+	}
+	else if (len >= 0x1000 || minlen >= 3) {
+		*wp++ = (unsigned char)( len        & 0x0F) | 0x80;
+		*wp++ = (unsigned char)((len >>  4) & 0xFF);
+		*wp++ = (unsigned char)((len >> 12) & 0xFF);
+	}
+	else if (len >= 0x40 || minlen >= 2) {
+		*wp++ = (unsigned char)( len        & 0x0F) | 0x40;
+		*wp++ = (unsigned char)((len >>  4) & 0xFF);
+	}
+	else {
+		*wp++ = (unsigned char)len;
+	}
+
+	return *this;
+}
+
+ACPIAMLWriter &ACPIAMLWriter::FieldOpElement(const char *name,const unsigned int bits) {
+	if (*name != 0)
+		Name(name);
+	else
+		*w++ = 0;
+
+	PkgLength(bits);
+	return *this;
+}
+
+ACPIAMLWriter &ACPIAMLWriter::BeginPkg(const unsigned int /*pred_length*/) {
+	pkg_t ent;
+
+	/* WARNING: Specify a size large enough. Once written, it cannot be extended if
+	 *          needed. By default, this code writes an overlarge field to make sure
+	 *          it can always update */
+
+	if (pkg_stack.size() >= 32) E_Exit("ACPI AML writer BeginPkg too much recursion");
+
+	ent.pkg_len = w;
+	PkgLength(MaxPkgSize);//placeholder
+	ent.pkg_data = w;
+
+	pkg_stack.push(std::move(ent));
+	return *this;
+}
+
+ACPIAMLWriter &ACPIAMLWriter::EndPkg(void) {
+	if (pkg_stack.empty()) E_Exit("ACPI AML writer EndPkg with empty stack");
+
+	pkg_t &ent = pkg_stack.top();
+
+	const unsigned long len = (unsigned long)(w - ent.pkg_len);
+	const unsigned int lflen = (unsigned int)(ent.pkg_data - ent.pkg_len);
+	PkgLength(len,ent.pkg_len,lflen);
+	if (ent.pkg_len != ent.pkg_data) E_Exit("ACPI AML writer length update exceeds pkglength field");
+	pkg_stack.pop();
+	return *this;
+}
+
+ACPIAMLWriter &ACPIAMLWriter::CountElement(void) {
+	if (pkg_stack.empty()) E_Exit("ACPI AML writer counting elements not supported unless within package");
+	pkg_stack.top().element_count++;
+	return *this;
+}
+
+ACPIAMLWriter::ACPIAMLWriter() {
+}
+
+ACPIAMLWriter::~ACPIAMLWriter() {
+}
+
+unsigned char* ACPIAMLWriter::writeptr(void) const {
+	return w;
+}
+
+void ACPIAMLWriter::begin(unsigned char *n_w,unsigned char *n_f) {
+	w = n_w;
+	f = n_f;
+}
+
+void BuildACPITable(void) {
+	uint32_t rsdt_reserved = 16384;
+	unsigned char *w,*f;
+	unsigned int i,c;
+
+	if (ACPI_buffer == NULL || ACPI_buffer_size < 32768) return;
+	w = ACPI_buffer;
+	f = ACPI_buffer+ACPI_buffer_size-rsdt_reserved;
+
+	/* RSDT starts at last 16KB of ACPI buffer because it needs to build up a list of other tables */
+	unsigned char *rsdt = f;
+
+	/* RSD PTR is written to the legacy BIOS region, on a 16-byte boundary */
+	Bitu rsdptr = ROMBIOS_GetMemory(20,"ACPI BIOS Root System Description Pointer",/*paragraph align*/16);
+	if (rsdptr == 0) E_Exit("ACPI BIOS RSD PTR alloc fail");
+	LOG(LOG_MISC,LOG_DEBUG)("ACPI: RSD PTR at 0x%lx",(unsigned long)rsdptr);
+
+	phys_writes(rsdptr +  0,"RSD PTR ",8); // Signature
+	phys_writeb(rsdptr +  8,0); // Checksum (fill in later)
+	phys_writes(rsdptr +  9,"DOSBOX",6); // OEMID
+	phys_writeb(rsdptr + 15,0); // Reserved must be zero
+	phys_writed(rsdptr + 16,acpiofs2phys( acpiptr2ofs( rsdt ) )); // RSDT physical address
+	c=0; for (i=0;i < 20;i++) c += phys_readb(rsdptr+i);
+	phys_writeb(rsdptr +  8,(0u - c)&0xFF); // Checksum
+
+	/* RSDT */
+	ACPISysDescTableWriter rsdt_tw;
+	rsdt_tw.begin(rsdt,ACPI_buffer+ACPI_buffer_size).setSig("RSDT").setRev(1);
+	unsigned int rsdt_tw_ofs = 36;
+	// leave open for adding one DWORD per table to the end as we go... this is why RSDT is written to the END of the ACPI region.
+
+	/* FACP, which does not have a checksum and does not follow the normal format */
+	unsigned char *facs = w;
+	size_t facs_size = 64;
+	w += facs_size;
+	{
+		assert(w <= f);
+		memset(facs,0,facs_size);
+		memcpy(facs+0x00,"FACS",4);
+		host_writed(facs+0x04,facs_size);
+		host_writed(facs+0x08,0x12345678UL); // hardware signature
+		host_writed(facs+0x0C,0); // firmware waking vector
+		ACPI_buffer_global_lock = acpiptr2ofs(facs+0x10);
+		host_writed(facs+0x10,0); // global lock
+		host_writed(facs+0x14,0); // S4BIOS_REQ not supported
+		LOG(LOG_MISC,LOG_DEBUG)("ACPI: FACS at 0x%lx len 0x%lx",(unsigned long)acpiofs2phys( acpiptr2ofs( facs ) ),(unsigned long)facs_size);
+	}
+
+	unsigned char *dsdt_base = w;
+	{
+		ACPISysDescTableWriter dsdt;
+		ACPIAMLWriter aml;
+
+		dsdt.begin(w,f).setSig("DSDT").setRev(1);
+		aml.begin(dsdt.getptr()+dsdt.get_tablesize(),f);
+
+		/* WARNING: To simplify this code, you are responsible for writing the AML in the syntax required.
+		 *          See the ACPI BIOS specification for more details.
+		 *
+		 * For reference:
+		 *
+		 * Name := [LeadNameChar NameChar NameChar NameChar] |
+		 *         [LeadNameChar NameChar NameChar '_'] |
+		 *         [LeadNameChar NameChar '_' '_'] |
+		 *         [LeadNameChar '_' '_' '_']
+		 *
+		 * DefName := NameOp Name DataTerm
+		 *     NameOp => 0x08
+		 *     Data := DataTerm [DataTerm ...]
+		 *     DataTerm := DataItem | DefPackage
+		 *     DataItem := DefBuffer | DefNum | DefString
+		 *
+		 *     How to write: ACPIAML1_NameOp(Name) followed by the necessary functions to write the buffer, string, etc. for the name. */
+		/* Name(TST1,0xAB) */
+		aml.NameOp("TST1").ByteOp(0xAB);
+		/* Name(TST2,0x1234) */
+		aml.NameOp("TST2").WordOp(0x1234);
+		/* Name(TST3,0x12345678) */
+		aml.NameOp("TST3").DwordOp(0x12345678);
+		/* Name(TST4,"Hello ACPI BIOS") */
+		aml.NameOp("TST4").StringOp("Hello ACPI BIOS");
+		/* OperationRegion(ABC,SystemMemory,0xAABB0000,0x4100) */
+		aml.OpRegionOp("ABC",ACPIRegionSpace::SystemMemory).DwordOp(0xAABB0000).WordOp(0x4100);
+		/* OperationRegion(ABC2,SystemIO,0x880,0x18) */
+		aml.OpRegionOp("ABC2",ACPIRegionSpace::SystemIO).WordOp(0x880).WordOp(0x18);
+		/* Field(ABC2,AnyAcc,Lock,Preserve) which also calls BeginPkg(), FieldOpEnd calls EndPkg(). Use only Field writing functions! */
+		aml.FieldOp("ABC2",ACPIAMLWriter::MaxPkgSize,ACPIFieldFlag::AccessType::AnyAcc|ACPIFieldFlag::LockRule::Lock|ACPIFieldFlag::UpdateRule::Preserve);
+		aml.FieldOpElement("AF00",1);
+		aml.FieldOpElement("AF01",3);
+		aml.FieldOpElement("",2);
+		aml.FieldOpElement("AF02",2);
+		aml.FieldOpElement("AF03",3);
+		aml.FieldOpElement("",5+8);
+		aml.FieldOpElement("AF04",8);
+		aml.FieldOpEnd();
+		/* Scope */
+		aml.ScopeOp("_SB");
+		aml.NameOp("TST1").DwordOp(0xABCDEF);
+		/* Package ABCD */
+		aml.NameOp("ABCD").PackageOp();
+		/* Package contents. YOU MUST COUNT ELEMENTS MANUALLY */
+		aml.DwordOp(0xABCDEF).CountElement();
+		aml.DwordOp(0x1234).CountElement();
+		aml.ZeroOp().CountElement();
+		aml.OneOp().CountElement();
+		aml.PackageOp();
+		aml.StringOp("Hello world").CountElement();
+		aml.DwordOp(0xABCD1234).CountElement();
+		aml.PackageOpEnd().CountElement();
+		/* Package end */
+		aml.PackageOpEnd();
+		aml.AliasOp("TST1","ATS1");
+		aml.AliasOp("TST2","ATS2");
+		aml.AliasOp("TST3","ATS3");
+		{
+			static const unsigned char dept_of_redundant_redundancy[] = {0x11,0x22,0x33,0xAA,0xBB,0xCC};
+			aml.NameOp("DORR").BufferOp(dept_of_redundant_redundancy,sizeof(dept_of_redundant_redundancy));
+		}
+		/* device PCI0 */
+		aml.DeviceOp("PCI0");
+		aml.NameOp("DUH").DwordOp(0xABCD1234);
+		aml.NameOp("NDUH").ZeroOp();
+		/* method KICK */
+		aml.MethodOp("KICK",ACPIAMLWriter::MaxPkgSize,ACPIMethodFlags::ArgCount(2)|ACPIMethodFlags::Serialized);
+		aml.StoreOp().DwordOp(0x12345678).LocalOp(0); /* Local0 = 0x12345678 */
+		aml.AndOp().LocalOp(0).DwordOp(0xF0F0F0F0).LocalOp(0); /* Local0 &= 0xF0F0F0F0 (literally: Op1 = Local0 Op2 = 0xF0F0F0F0 Target = Local0) */
+		aml.StoreOp()./*(*/AndOp().LocalOp(0).DwordOp(0xFF00FF00).NothingOp()/*)*/.LocalOp(1); /* Local1 = Local0 & 0xFF00FF00 */
+		aml.StoreOp()./*(*/OrOp()./*(*/AndOp().LocalOp(0).DwordOp(0xCECECECE).NothingOp()/*)*/.DwordOp(0x03030303).NothingOp()/*)*/.LocalOp(2); /* Local2 = (Local0 & 0xFF00FF00) | 0x03030303 */
+		aml.IfOp().LEqualOp().Name("DUH").DwordOp(0xABCD1234); /* if (DUH == 0xABCD1234) { */
+			aml.ReturnOp().DwordOp(6); /* return 6; */
+		aml.IfOpEnd(); /* } (/if) */
+		aml.ElseOp(); /* else { */
+			aml.IfOp().LAndOp().Name("DUH").Name("NDUH"); /* if (DUH && NDUH) { */
+				aml.ReturnOp().DwordOp(77); /* return 77; */
+			aml.IfOpEnd(); /* } (/if) */
+			aml.IfOp().AndOp().Name("DUH").DwordOp(0x40103).NothingOp(); /* if (DUH & 0x40103) {    (note AndOp Op1 Op2 Target == "DUH" 0x40103 Nothing) */
+				aml.ReturnOp().DwordOp(77); /* return 79; */
+			aml.IfOpEnd(); /* } (/if) */
+		aml.ElseOpEnd(); /* } (/else) */
+
+		aml.IfOp().Name("DUH"); /* if (DUH) { */
+			aml.ReturnOp().DwordOp(3); /* return 3; */
+		aml.IfOpEnd(); /* } (/if) */
+		aml.ElseOp(); /* else { */
+			aml.IfOp().Name("NDUH"); /* if (NDUH) { */
+				aml.ReturnOp().OneOp(); /* return 1; */
+			aml.IfOpEnd(); /* } (/if) */
+			aml.ElseOp(); /* else { */
+				aml.IfOp().LNotEqualOp().Name("NDUH").DwordOp(52); /* if (NDUH != 52) { */
+					aml.ReturnOp().DwordOp(666); /* return 666; */
+				aml.IfOpEnd(); /* } (/if) */
+				aml.ElseOp(); /* else { */
+					aml.ReturnOp().ZeroOp(); /* return 0; */
+				aml.ElseOpEnd(); /* } (/else) */
+			aml.ElseOpEnd(); /* } (/else) */
+		aml.ElseOpEnd(); /* } (/else) */
+		aml.MethodOpEnd();
+		/* end method */
+		aml.DeviceOpEnd();
+		/* end device */
+		aml.ScopeOpEnd();
+		/* end scope */
+
+		assert(aml.writeptr() >= (dsdt.getptr()+dsdt.get_tablesize()));
+		assert(aml.writeptr() <= f);
+		dsdt.expandto((size_t)(aml.writeptr() - dsdt.getptr()));
+		LOG(LOG_MISC,LOG_DEBUG)("ACPI: DSDT at 0x%lx len 0x%lx",(unsigned long)acpiofs2phys( acpiptr2ofs( dsdt_base ) ),(unsigned long)dsdt.get_tablesize());
+		w = dsdt.finish();
+	}
+
+	{
+		ACPISysDescTableWriter facp;
+		const PhysPt facp_offset = acpiofs2phys( acpiptr2ofs( w ) );
+
+		host_writed(rsdt_tw.getptr(rsdt_tw_ofs,4),(uint32_t)facp_offset);
+		rsdt_tw_ofs += 4;
+
+		facp.begin(w,f,116).setSig("FACP").setRev(1);
+		host_writed(w+36,acpiofs2phys( acpiptr2ofs( facs ) ) ); // FIRMWARE_CTRL (FACS table)
+		host_writed(w+40,acpiofs2phys( acpiptr2ofs( dsdt_base ) ) ); // DSDT
+		w[44] = 0; // dual PIC PC-AT type implementation
+		host_writew(w+46,ACPI_IRQ); // SCI_INT
+		host_writed(w+48,ACPI_SMI_CMD); // SCI_CMD (I/O port)
+		w[52] = ACPI_ENABLE_CMD; // what the guest writes to SMI_CMD to disable SMI ownership from BIOS during bootup
+		w[53] = ACPI_DISABLE_CMD; // what the guest writes to SMI_CMD to re-enable SMI ownership to BIOS
+		// TODO: S4BIOS_REQ
+		host_writed(w+56,ACPI_PM1A_EVT_BLK); // PM1a_EVT_BLK event register block
+		host_writed(w+64,ACPI_PM1A_CNT_BLK); // PM1a_CNT_BLK control register block
+		host_writed(w+76,ACPI_PM_TMR_BLK); // PM_TMR_BLK power management timer control register block
+		w[88] = 4; // PM1_EVT_LEN
+		w[89] = 2; // PM1_CNT_LEN
+		w[90] = 0; // PM2_CNT_LEN
+		w[91] = 4; // PM_TM_LEN
+		host_writed(w+112,(1u << 0u)/*WBINVD*/);
+		LOG(LOG_MISC,LOG_DEBUG)("ACPI: FACP at 0x%lx len 0x%lx",(unsigned long)facp_offset,(unsigned long)facp.get_tablesize());
+		w = facp.finish();
+	}
+
+	/* Finish RSDT */
+	LOG(LOG_MISC,LOG_DEBUG)("ACPI: RDST at 0x%lx len 0x%lx",(unsigned long)acpiofs2phys( acpiptr2ofs( rsdt ) ),(unsigned long)rsdt_tw.get_tablesize());
+	rsdt_tw.finish();
+}
+
 class BIOS:public Module_base{
 private:
     static Bitu cb_bios_post__func(void) {
@@ -7970,6 +9365,21 @@ private:
 # endif
 #endif
 
+	INT13_ElTorito_NoEmuDriveNumber = 0;
+	INT13_ElTorito_NoEmuCDROMDrive = 0;
+	INT13_ElTorito_IDEInterface = -1;
+
+	ACPI_mem_enable(false);
+	ACPI_REGION_SIZE = 0;
+	ACPI_BASE = 0;
+	ACPI_enabled = false;
+	ACPI_version = 0;
+	ACPI_free();
+	ACPI_SCI_EN = false;
+	ACPI_BM_RLD = false;
+	ACPI_PM1_Status = 0;
+	ACPI_PM1_Enable = 0;
+
         /* If we're here because of a JMP to F000:FFF0 from a DOS program, then
          * an actual reset is needed to prevent reentrancy problems with the DOS
          * kernel shell. The WINNT.EXE install program for Windows NT/2000/XP
@@ -7977,17 +9387,48 @@ private:
         if (!dos_kernel_disabled && first_shell != NULL) {
 		LOG(LOG_MISC,LOG_DEBUG)("BIOS POST: JMP to F000:FFF0 detected, initiating proper reset");
 		throw int(9);
-        }
+	}
 
-        {
-            Section_prop * section=static_cast<Section_prop *>(control->GetSection("dosbox"));
-            int val = section->Get_int("reboot delay");
+	{
+		Section_prop * section=static_cast<Section_prop *>(control->GetSection("dosbox"));
+		int val = section->Get_int("reboot delay");
 
-            if (val < 0)
-                val = IS_PC98_ARCH ? 1000 : 500;
+		if (val < 0)
+			val = IS_PC98_ARCH ? 1000 : 500;
 
-            reset_post_delay = (unsigned int)val;
-        }
+		reset_post_delay = (unsigned int)val;
+
+		/* Read the ACPI setting and decide on a ACPI region to use */
+		{
+			std::string s = section->Get_string("acpi");
+
+			if (IS_PC98_ARCH) {
+				/* do not enable ACPI, PC-98 does not have it */
+			}
+			else if (MEM_get_address_bits() < 32) {
+				/* I doubt any 486DX systems with less than 32 address bits has ACPI */
+			}
+			else if (CPU_ArchitectureType < CPU_ARCHTYPE_386) {
+				/* Your 286 does not have ACPI and it never will.
+				 * Your 386 as well, but the 386 is 32-bit and the user might change it to 486 or higher later though, so we'll allow that */
+			}
+			else if (s == "1.0") {
+				ACPI_version = 0x100;
+				ACPI_REGION_SIZE = (256u << 10u); // 256KB
+			}
+			else if (s == "1.0b") {
+				ACPI_version = 0x10B;
+				ACPI_REGION_SIZE = (256u << 10u); // 256KB
+			}
+		}
+
+		/* TODO: Read from dosbox.conf */
+		if (ACPI_version != 0) {
+			ACPI_IRQ = 9;
+			ACPI_IO_BASE = 0x820;
+			ACPI_SMI_CMD = 0x828;
+		}
+	}
 
         if (bios_post_counter != 0 && reset_post_delay != 0) {
             /* reboot delay, in case the guest OS/application had something to day before hitting the "reset" signal */
@@ -8261,6 +9702,20 @@ private:
         bios_has_exec_vga_bios = false;
         LOG(LOG_MISC,LOG_DEBUG)("BIOS: executing POST routine");
 
+	if (ACPI_REGION_SIZE != 0) {
+		// place it just below the mirror of the BIOS at FFFF0000
+		ACPI_BASE = 0xFFFF0000 - ACPI_REGION_SIZE;
+
+		LOG(LOG_MISC,LOG_DEBUG)("ACPI: Setting up version %u.%02x at 0x%lx-0x%lx",
+			ACPI_version>>8,ACPI_version&0xFF,
+			(unsigned long)ACPI_BASE,(unsigned long)(ACPI_BASE+ACPI_REGION_SIZE-1lu));
+
+		ACPI_init();
+		ACPI_enabled = true;
+		ACPI_mem_enable(true);
+		memset(ACPI_buffer,0,ACPI_buffer_size);
+	}
+
         // TODO: Anything we can test in the CPU here?
 
         // initialize registers
@@ -8291,6 +9746,11 @@ private:
         if (isapnp_biosstruct_base != 0) {
             ROMBIOS_FreeMemory(isapnp_biosstruct_base);
             isapnp_biosstruct_base = 0;
+        }
+
+        if (acpi_iocallout != IO_Callout_t_none) {
+            IO_FreeCallout(acpi_iocallout);
+            acpi_iocallout = IO_Callout_t_none;
         }
 
         if (BOCHS_PORT_E9) {
@@ -9157,6 +10617,22 @@ private:
             }
         }
 
+	if (ACPI_enabled) {
+		if (acpi_iocallout == IO_Callout_t_none)
+			acpi_iocallout = IO_AllocateCallout(IO_TYPE_MB);
+		if (acpi_iocallout == IO_Callout_t_none)
+			E_Exit("Failed to get ACPI IO callout handle");
+
+		{
+			IO_CalloutObject *obj = IO_GetCallout(acpi_iocallout);
+			if (obj == NULL) E_Exit("Failed to get ACPI IO callout");
+			obj->Install(ACPI_IO_BASE,IOMASK_Combine(IOMASK_FULL,IOMASK_Range(0x20)),acpi_cb_port_r,acpi_cb_port_w);
+			IO_PutCallout(obj);
+		}
+
+		BuildACPITable();
+	}
+
         CPU_STI();
 
         return CBRET_NONE;
@@ -10010,7 +11486,7 @@ public:
                     isa_memory_hole_15mb = false;
             }
 
-            // FIXME: Erm, well this couldv'e been named better. It refers to the amount of conventional memory
+            // FIXME: Erm, well this could've been named better. It refers to the amount of conventional memory
             //        made available to the operating system below 1MB, which is usually DOS.
             dos_conventional_limit = (unsigned int)section->Get_int("dos mem limit");
 
@@ -10476,6 +11952,11 @@ public:
          * and if allowed to do its thing in a 32-bit guest OS like WinNT, will trigger
          * a page fault. */
         CPU_Snap_Back_To_Real_Mode();
+
+        if (acpi_iocallout != IO_Callout_t_none) {
+            IO_FreeCallout(acpi_iocallout);
+            acpi_iocallout = IO_Callout_t_none;
+        }
 
         if (BOCHS_PORT_E9) {
             delete BOCHS_PORT_E9;

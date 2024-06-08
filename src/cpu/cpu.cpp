@@ -2917,6 +2917,14 @@ void CPU_VERW(Bitu selector) {
 	SETFLAGBIT(ZF,true);
 }
 
+/* This is called by the XMS emulation to set up Flat Real Mode, at least for segment registers DS and ES */
+void XMS_InitFlatRealMode(void) {
+	if (!cpu.pmode && !(reg_flags & FLAG_VM)) {
+		Segs.limit[ds] = 0xFFFFFFFFul;
+		Segs.limit[es] = 0xFFFFFFFFul;
+	}
+}
+
 bool CPU_SetSegGeneral(SegNames seg,uint16_t value) {
 	if (!cpu.pmode || (reg_flags & FLAG_VM)) {
 		Segs.val[seg]=value;
@@ -3148,6 +3156,10 @@ Bits HLT_Decode(void) {
 	return 0;
 }
 
+bool CPU_IsHLTed(void) {
+	return (cpudecoder == &HLT_Decode);
+}
+
 void CPU_HLT(uint32_t oldeip) {
 	/* Since cpu.hlt.old_decoder assigns the current decoder to old, and relies on restoring
 	 * it back when finished, setting cpudecoder to HLT_Decode while already HLT_Decode effectively
@@ -3376,12 +3388,12 @@ public:
 	~Weitek_PageHandler() {
 	}
 
-	uint8_t readb(PhysPt addr);
-	void writeb(PhysPt addr,uint8_t val);
-	uint16_t readw(PhysPt addr);
-	void writew(PhysPt addr,uint16_t val);
-	uint32_t readd(PhysPt addr);
-	void writed(PhysPt addr,uint32_t val);
+	uint8_t readb(PhysPt addr) override;
+	void writeb(PhysPt addr,uint8_t val) override;
+	uint16_t readw(PhysPt addr) override;
+	void writew(PhysPt addr,uint16_t val) override;
+	uint32_t readd(PhysPt addr) override;
+	void writed(PhysPt addr,uint32_t val) override;
 };
 
 uint8_t Weitek_PageHandler::readb(PhysPt addr) {
@@ -3410,7 +3422,7 @@ void Weitek_PageHandler::writed(PhysPt addr,uint32_t val) {
 	LOG_MSG("Weitek stub: writed at 0x%lx val=0x%lx",(unsigned long)addr,(unsigned long)val);
 }
 
-Weitek_PageHandler weitek_pagehandler(0);
+Weitek_PageHandler weitek_pagehandler(nullptr);
 
 PageHandler* weitek_memio_cb(MEM_CalloutObject &co,Bitu phys_page) {
     (void)co; // UNUSED
@@ -3581,7 +3593,7 @@ public:
 		CPU_JMP(false,0,0,0);					//Setup the first cpu core
         menu_update_dynamic();
 	}
-	bool Change_Config(Section* newconfig){
+	bool Change_Config(Section* newconfig) override {
 		const Section_prop * section=static_cast<Section_prop *>(newconfig);
 		CPU_AutoDetermineMode=CPU_AUTODETERMINE_NONE;
 		//CPU_CycleLeft=0;//needed ?
@@ -3618,7 +3630,7 @@ public:
 		Prop_multival* p = section->Get_multival("cycles");
 		std::string type = p->GetSection()->Get_string("type");
 		std::string str ;
-		CommandLine cmd(0,p->GetSection()->Get_string("parameters"));
+		CommandLine cmd(nullptr,p->GetSection()->Get_string("parameters"));
 		if (type=="max") {
 			RDTSC_rebase();
 			CPU_CycleMax=0;
@@ -4300,7 +4312,7 @@ CPU_Decoder* CPU_IndexDecoderType(uint16_t decoder_idx)
 	case 102: return &CPU_Core_Dynrec_Trap_Run;
 #endif
     case 200: return &HLT_Decode;
-    default: return 0;
+    default: return nullptr;
     }
 }
 
@@ -4710,7 +4722,7 @@ SerializeCPU() : SerializeGlobalPOD("CPU")
 {}
 
 private:
-virtual void getBytes(std::ostream& stream)
+void getBytes(std::ostream& stream) override
 {
     uint16_t decoder_idx;
 
@@ -4766,7 +4778,7 @@ virtual void getBytes(std::ostream& stream)
 	POD_Save_CPU_Paging(stream);
 }
 
-virtual void setBytes(std::istream& stream)
+void setBytes(std::istream& stream) override
 {
     uint16_t decoder_idx;
     uint16_t decoder_old;

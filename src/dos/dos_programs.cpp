@@ -58,6 +58,7 @@
 #include "menu.h"
 #include "render.h"
 #include "mouse.h"
+#include "eltorito.h"
 #include "../ints/int10.h"
 #include "../output/output_opengl.h"
 #include "paging.h"
@@ -144,7 +145,7 @@ Bitu DEBUG_EnableDebugger(void);
 
 class MOUSE : public Program {
 public:
-    void Run(void);
+    void Run(void) override;
 };
 
 void MOUSE::Run(void) {
@@ -263,7 +264,7 @@ static const char* UnmountHelper(char umount) {
         }
         if (image && !partitionMount) DetachFromBios(image);
         if (cdrom) IDE_CDROM_Detach(i_drive);
-        Drives[i_drive] = 0;
+        Drives[i_drive] = nullptr;
         DOS_EnableDriveMenu(i_drive+'A');
         mem_writeb(Real2Phys(dos.tables.mediaid)+(unsigned int)i_drive*dos.tables.dpb_size,0);
         if (i_drive == DOS_GetDefaultDrive())
@@ -550,7 +551,7 @@ void MenuBrowseCDImage(char drive, int num) {
     std::string files="", fname="";
     const char *lFilterPatterns[] = {"*.iso","*.cue","*.bin","*.chd","*.mdf","*.gog","*.ins","*.ISO","*.CUE","*.BIN","*.CHD","*.MDF","*.GOG","*.INS"};
     const char *lFilterDescription = "CD image files (*.iso, *.cue, *.bin, *.chd, *.mdf, *.gog, *.ins)";
-    lTheOpenFileName = tinyfd_openFileDialog("Select a CD image file","",14,lFilterPatterns,lFilterDescription,0);
+    lTheOpenFileName = tinyfd_openFileDialog("Select a CD image file","", sizeof(lFilterPatterns) / sizeof(lFilterPatterns[0]),lFilterPatterns,lFilterDescription,0);
 
     if (lTheOpenFileName) {
         isoDrive *cdrom = dynamic_cast<isoDrive*>(Drives[drive-'A']);
@@ -596,7 +597,7 @@ void MenuBrowseFDImage(char drive, int num, int type) {
     std::string files="", fname="";
     const char *lFilterPatterns[] = {"*.ima","*.img","*.xdf","*.fdi","*.hdm","*.nfd","*.d88","*.IMA","*.IMG","*.XDF","*.FDI","*.HDM","*.NFD","*.D88"};
     const char *lFilterDescription = "Floppy image files (*.ima, *.img, *.xdf, *.fdi, *.hdm, *.nfd, *.d88)";
-    lTheOpenFileName = tinyfd_openFileDialog("Select a floppy image file","",4,lFilterPatterns,lFilterDescription,0);
+    lTheOpenFileName = tinyfd_openFileDialog("Select a floppy image file","",sizeof(lFilterPatterns)/sizeof(lFilterPatterns[0]), lFilterPatterns, lFilterDescription, 0);
 
     if (lTheOpenFileName) {
         //uint8_t mediaid = 0xF0; UNUSED
@@ -653,12 +654,12 @@ void MenuBrowseImageFile(char drive, bool arc, bool boot, bool multiple) {
     if (arc) {
         const char *lFilterPatterns[] = {"*.zip","*.7z","*.ZIP","*.7Z"};
         const char *lFilterDescription = "Archive files (*.zip, *.7z)";
-        lTheOpenFileName = tinyfd_openFileDialog(("Select an archive file for Drive "+str+":").c_str(),"",4,lFilterPatterns,lFilterDescription,0);
+        lTheOpenFileName = tinyfd_openFileDialog(("Select an archive file for Drive "+str+":").c_str(),"", sizeof(lFilterPatterns) / sizeof(lFilterPatterns[0]),lFilterPatterns,lFilterDescription,0);
         if (lTheOpenFileName) fname = GetNewStr(lTheOpenFileName);
     } else {
-        const char *lFilterPatterns[] = {"*.ima","*.img","*.vhd","*.fdi","*.hdi","*.nfd","*.nhd","*.d88","*.hdm","*.xdf","*.iso","*.cue","*.bin","*.chd","*.mdf","*.gog","*.ins","*.IMA","*.IMG","*.VHD","*.FDI","*.HDI","*.NFD","*.NHD","*.D88","*.HDM","*.XDF","*.ISO","*.CUE","*.BIN","*.CHD","*.MDF","*.GOG","*.INS"};
+        const char *lFilterPatterns[] = {"*.ima","*.img","*.vhd","*.fdi","*.hdi","*.nfd","*.nhd","*.d88","*.hdm","*.xdf","*.iso","*.cue","*.bin","*.chd","*.mdf","*.gog","*.ins","*.ccd","*.IMA","*.IMG","*.VHD","*.FDI","*.HDI","*.NFD","*.NHD","*.D88","*.HDM","*.XDF","*.ISO","*.CUE","*.BIN","*.CHD","*.MDF","*.GOG","*.INS", "*.CCD"};
         const char *lFilterDescription = "Disk/CD image files";
-        lTheOpenFileName = tinyfd_openFileDialog(((multiple?"Select image file(s) for Drive ":"Select an image file for Drive ")+str+":").c_str(),"",22,lFilterPatterns,lFilterDescription,multiple?1:0);
+        lTheOpenFileName = tinyfd_openFileDialog(((multiple?"Select image file(s) for Drive ":"Select an image file for Drive ")+str+":").c_str(),"", sizeof(lFilterPatterns) / sizeof(lFilterPatterns[0]),lFilterPatterns,lFilterDescription,multiple?1:0);
         if (lTheOpenFileName) fname = GetNewStr(lTheOpenFileName);
         if (multiple&&fname.size()) {
             files += "\"";
@@ -667,7 +668,7 @@ void MenuBrowseImageFile(char drive, bool arc, bool boot, bool multiple) {
             files += "\" ";
         }
         while (multiple&&lTheOpenFileName&&systemmessagebox("Mount image files","Do you want to mount more image file(s)?","yesno", "question", 1)) {
-            lTheOpenFileName = tinyfd_openFileDialog(("Select image file(s) for Drive "+str+":").c_str(),"",20,lFilterPatterns,lFilterDescription,multiple?1:0);
+            lTheOpenFileName = tinyfd_openFileDialog(("Select image file(s) for Drive "+str+":").c_str(),"", sizeof(lFilterPatterns) / sizeof(lFilterPatterns[0]),lFilterPatterns,lFilterDescription,multiple?1:0);
             if (lTheOpenFileName) {
                 fname = GetNewStr(lTheOpenFileName);
                 files += "\"";
@@ -961,7 +962,7 @@ public:
             }
             /* remap drives */
             Drives[i_newz] = Drives[ZDRIVE_NUM];
-            Drives[ZDRIVE_NUM] = 0;
+            Drives[ZDRIVE_NUM] = nullptr;
             DOS_EnableDriveMenu(i_newz + 'A');
             DOS_EnableDriveMenu(ZDRIVE_NUM + 'A');
             if (!first_shell) return; //Should not be possible
@@ -1043,7 +1044,7 @@ public:
         dos.dta(save_dta);
     }
 
-    void Run(void) {
+    void Run(void) override {
         DOS_Drive *newdrive = NULL;
         std::string label;
         std::string umount;
@@ -1174,7 +1175,7 @@ public:
                     // freesize in kb
                     sprintf(teststr,"512,1,2880,%d",freesize*1024/(512*1)>2880?2880:freesize*1024/(512*1));
                 } else {
-					if (freesize>1919) freesize=1919;
+					//if (freesize>1919) freesize=1919;
 					uint16_t numc=type=="cdrom"?1:32;
                     uint32_t total_size_cyl=32765;
 					uint32_t tmp=(uint32_t)freesize*1024*1024/(type=="cdrom"?2048*1:512*32);
@@ -1549,7 +1550,7 @@ public:
                               WriteOut("Existing overlay has been replaced with new overlay.\n");
                           }
                           delete Drives[drive-'A'];
-                          Drives[drive-'A'] = 0;
+                          Drives[drive-'A'] = nullptr;
                       }
                   } else { 
                       if (!quiet) WriteOut(MSG_Get("PROGRAM_MOUNT_OVERLAY_ERROR"));
@@ -1623,7 +1624,7 @@ void GUI_Run(bool pressed);
 
 class CFGTOOL : public Program {
 public:
-    void Run(void) {
+    void Run(void) override {
         if (cmd->FindExist("-?", false) || cmd->FindExist("/?", false)) {
 			WriteOut("Starts DOSBox-X's graphical configuration tool.\n\nCFGTOOL\n\nNote: You can also use CONFIG command for command-line configurations.\n");
             return;
@@ -1659,19 +1660,19 @@ class PC98ITFPageHandler : public PageHandler {
 public:
     PC98ITFPageHandler() : PageHandler(PFLAG_READABLE|PFLAG_HASROM) {}
     PC98ITFPageHandler(Bitu flags) : PageHandler(flags) {}
-    HostPt GetHostReadPt(Bitu phys_page) {
+    HostPt GetHostReadPt(Bitu phys_page) override {
         return PC98_ITF_ROM+(phys_page&0x7)*MEM_PAGESIZE;
     }
-    HostPt GetHostWritePt(Bitu phys_page) {
+    HostPt GetHostWritePt(Bitu phys_page) override {
         return PC98_ITF_ROM+(phys_page&0x7)*MEM_PAGESIZE;
     }
-    void writeb(PhysPt addr,uint8_t val){
+    void writeb(PhysPt addr,uint8_t val) override {
         LOG(LOG_CPU,LOG_ERROR)("Write %x to rom at %x",(int)val,(int)addr);
     }
-    void writew(PhysPt addr,uint16_t val){
+    void writew(PhysPt addr,uint16_t val) override {
         LOG(LOG_CPU,LOG_ERROR)("Write %x to rom at %x",(int)val,(int)addr);
     }
-    void writed(PhysPt addr,uint32_t val){
+    void writed(PhysPt addr,uint32_t val) override {
         LOG(LOG_CPU,LOG_ERROR)("Write %x to rom at %x",(int)val,(int)addr);
     }
 };
@@ -1730,6 +1731,8 @@ void pc98_43d_write(Bitu port,Bitu val,Bitu iolen) {
             break;
     }
 }
+
+int IDE_MatchCDROMDrive(char drv);
 
 #if defined(WIN32)
 #include <fcntl.h>
@@ -1817,7 +1820,7 @@ private:
         uint8_t drive;
         char fullname[DOS_PATHLENGTH];
 
-        localDrive* ldp=0;
+        localDrive* ldp=nullptr;
 		bool readonly=wpcolon&&strlen(filename)>1&&filename[0]==':';
         if (!DOS_MakeName(readonly?filename+1:filename,fullname,&drive)) return NULL;
 
@@ -1902,15 +1905,19 @@ public:
    
     /*! \brief      Program entry point, when the command is run
      */
-    void Run(void) {
+    void Run(void) override {
+        std::string tmp;
         std::string bios;
         std::string boothax_str;
+        std::string el_torito_mode="noemu";
+        std::string el_torito;
         bool pc98_640x200 = true;
         bool pc98_show_graphics = false;
         bool bios_boot = false;
         bool swaponedrive = false;
         bool convertro = false;
         bool force = false;
+        int loadseg_user = -1;
         int convimg = -1;
         int quiet = 0;
 
@@ -1923,6 +1930,23 @@ public:
 
         if (cmd->FindExist("-swap-one-drive",true))
             swaponedrive = true;
+
+        //look for -el-torito parameter and remove it from the command line.
+        //This is copy-pasta to be consistent with the IMGMOUNT command which accepts this as either -el-torito or -bootcd.
+        //But with one important difference: Unlike IMGMOUNT which only supports bootable floppy emulation, this version lets
+        //you specify any other mode, though at this time, only "no emulation" mode is supported. You specify it as a =suffix
+        //i.e. -el-torito d:=noemu. No emulation mode is default, the IMGMOUNT --el-torito is still recommended for booting
+        //floppy emulation at this time.
+        cmd->FindString("-el-torito",el_torito,true);
+        if(el_torito == "") cmd->FindString("-bootcd", el_torito, true);
+
+        if (!el_torito.empty()) {
+            size_t o = el_torito.find_last_of('=');
+            if (o != std::string::npos && (o+1) < el_torito.length()) {
+                el_torito_mode = el_torito.substr(o+1);
+                el_torito = el_torito.substr(0,o);
+            }
+        }
 
         // debugging options
         if (cmd->FindExist("-pc98-640x200",true))
@@ -1953,6 +1977,10 @@ public:
 
         if (cmd->FindString("-bios",bios,true))
             bios_boot = true;
+
+        cmd->FindString("-load-seg",tmp,true);
+        if (!tmp.empty())
+            loadseg_user = strtoul(tmp.c_str(),NULL,0);
 
         cmd->FindString("-boothax",boothax_str,true);
 
@@ -2078,11 +2106,14 @@ public:
          *    SS:SP = ???
          *
          * PC-98:
-         *    CS:IP = 1FE0:0000     Load = 1FE0:0000
+         *    CS:IP = 1FC0:0000     Load = 1FC0:0000
          *    SS:SP = 0030:00D8
+         *
+         * Reportedly PC-98 will load to 1FE0:0000 when booting the 1.44MB format (512 bytes per sector).
+         * Note that 0x1FC0:0000 leaves enough room for the 1024 bytes per sector format of PC-98.
          */
         Bitu stack_seg=IS_PC98_ARCH ? 0x0030 : 0x7000;
-        Bitu load_seg;//=IS_PC98_ARCH ? 0x1FE0 : 0x07C0;
+        Bitu load_seg;//=IS_PC98_ARCH ? 0x1FC0 : 0x07C0;
 
         if (MEM_TotalPages() > 0x9C)
             max_seg = 0x9C00;
@@ -2091,6 +2122,245 @@ public:
 
         if ((stack_seg+0x20) > max_seg)
             stack_seg = max_seg - 0x20;
+
+        /* if booting El Torito, the drive specified must be a CD-ROM drive */
+        if (!el_torito.empty()) {
+            //get el-torito floppy from cdrom mounted at drive letter el_torito_cd_drive
+            char el_torito_cd_drive = toupper(el_torito[0]);
+            if (el_torito_cd_drive < 'A' || el_torito_cd_drive > 'Z') {
+                printError();
+                return;
+            }
+
+            if (IS_PC98_ARCH) {
+                /* PC-98 doesn't have a bootable CD-ROM specification... does it?
+                 * By the time that became common the NEC basically switched to
+                 * making IBM PC-AT compatible Windows 95 systems anyway. */
+                printError();
+                return;
+            }
+
+            drive = 0;
+            if (!cmd->GetCount()) {
+                drive = 'A' + (dos_kernel_disabled?26:DOS_GetDefaultDrive());
+            }
+            else if (cmd->GetCount() == 1) {
+                cmd->FindCommand(1, temp_line);
+                if (temp_line.length()==2&&toupper(temp_line[0])>='A'&&toupper(temp_line[0])<='Z'&&temp_line[1]==':') {
+                    drive = toupper(temp_line[0]);
+               }
+            }
+            else {
+                printError();
+                return;
+            }
+
+            /* must be valid drive letter, C to Z */
+            if (!isalpha(el_torito_cd_drive) || el_torito_cd_drive < 'C') {
+                WriteOut("El Torito emulation requires a proper CD-ROM drive letter\n");
+                return;
+            }
+
+            /* drive must not exist (as a hard drive) */
+            if (imageDiskList[el_torito_cd_drive - 'A'] != NULL) {
+                WriteOut("El Torito CD-ROM drive specified already exists as a non-CD-ROM device\n");
+                return;
+            }
+
+            bool GetMSCDEXDrive(unsigned char drive_letter, CDROM_Interface **_cdrom);
+
+            /* get the CD-ROM drive */
+            CDROM_Interface *src_drive = NULL;
+            if (!GetMSCDEXDrive(el_torito_cd_drive - 'A', &src_drive)) {
+                WriteOut("El Torito CD-ROM drive specified is not actually a CD-ROM drive\n");
+                return;
+            }
+
+            /* "No emulation" boot is the only mode supported at this time.
+             * For floppy emulation boot, use IMGMOUNT and then boot the emulated floppy drive. */
+            if (el_torito_mode != "noemu") {
+                WriteOut("Unsupported boot mode");
+                return;
+            }
+
+            unsigned char entries[2048], *entry, ent_num = 0;
+            int header_platform = -1, header_count = 0;
+            bool header_final = false;
+            int header_more = -1;
+
+            /* Okay. Step #1: Scan the volume descriptors for the Boot Record. */
+            unsigned long el_torito_base = 0, boot_record_sector = 0, el_torito_rba = (~0ul), el_torito_load_segment = 0, el_torito_sectors = 0/*VIRTUAL SECTORS*/;
+	    unsigned char el_torito_mediatype = 0;
+            if (!ElTorito_ScanForBootRecord(src_drive, boot_record_sector, el_torito_base)) {
+                WriteOut("El Torito CD-ROM boot record not found\n");
+                return;
+            }
+
+	    LOG_MSG("El Torito looking for mode '%s'",el_torito_mode.c_str());
+            LOG_MSG("El Torito emulation: Found ISO 9660 Boot Record in sector %lu, pointing to sector %lu\n",
+                boot_record_sector, el_torito_base);
+
+            /* Step #2: Parse the records. Each one is 32 bytes long */
+            if (!src_drive->ReadSectorsHost(entries, false, el_torito_base, 1)) {
+                WriteOut("El Torito entries unreadable\n");
+                return;
+            }
+
+            /* for more information about what this loop is doing, read:
+             * http://download.intel.com/support/motherboards/desktop/sb/specscdrom.pdf
+             */
+            for (ent_num = 0; ent_num < (2048 / 0x20); ent_num++) {
+                    entry = entries + (ent_num * 0x20);
+
+                    if (memcmp(entry, "\0\0\0\0""\0\0\0\0""\0\0\0\0""\0\0\0\0""\0\0\0\0""\0\0\0\0""\0\0\0\0""\0\0\0\0", 32) == 0)
+                            break;
+
+                    if (entry[0] == 0x01/*header*/) {
+                            if (!ElTorito_ChecksumRecord(entry)) {
+                                    LOG_MSG("Warning: El Torito checksum error in header(0x01) entry\n");
+                                    continue;
+                            }
+
+                            if (header_count != 0) {
+                                    LOG_MSG("Warning: El Torito has more than one Header/validation entry\n");
+                                    continue;
+                            }
+
+                            if (header_final) {
+                                    LOG_MSG("Warning: El Torito has an additional header past the final header\n");
+                                    continue;
+                            }
+
+                            header_more = -1;
+                            header_platform = entry[1];
+                            LOG_MSG("El Torito entry: first header platform=0x%02x\n", header_platform);
+                            header_count++;
+                    }
+                    else if (entry[0] == 0x90/*header, more follows*/ || entry[0] == 0x91/*final header*/) {
+                            if (header_final) {
+                                    LOG_MSG("Warning: El Torito has an additional header past the final header\n");
+                                    continue;
+                            }
+
+                            header_final = (entry[0] == 0x91);
+                            header_more = (int)(((unsigned int)entry[2]) + (((unsigned int)entry[3]) << 8u));
+                            header_platform = entry[1];
+                            LOG_MSG("El Torito entry: first header platform=0x%02x more=%u final=%u\n", header_platform, header_more, header_final);
+                            header_count++;
+                    }
+                    else {
+                            if (header_more == 0) {
+                                    LOG_MSG("El Torito entry: Non-header entry count expired, ignoring record 0x%02x\n", entry[0]);
+                                    continue;
+                            }
+                            else if (header_more > 0) {
+                                    header_more--;
+                            }
+
+                            if (entry[0] == 0x44) {
+                                    LOG_MSG("El Torito entry: ignoring extension record\n");
+                            }
+                            else if (entry[0] == 0x00/*non-bootable*/) {
+                                    LOG_MSG("El Torito entry: ignoring non-bootable record\n");
+                            }
+                            else if (entry[0] == 0x88/*bootable*/) {
+                                    if (header_platform == 0x00/*x86*/) {
+                                            unsigned char mediatype = entry[1] & 0xF;
+                                            unsigned short load_segment = ((unsigned int)entry[2]) + (((unsigned int)entry[3]) << 8);
+                                            unsigned char system_type = entry[4];
+                                            unsigned short sector_count = ((unsigned int)entry[6]) + (((unsigned int)entry[7]) << 8);
+                                            unsigned long load_rba = ((unsigned int)entry[8]) + (((unsigned int)entry[9]) << 8) +
+                                                    (((unsigned int)entry[10]) << 16) + (((unsigned int)entry[11]) << 24);
+
+                                            LOG_MSG("El Torito entry: bootable x86 record mediatype=%u load_segment=0x%04x "
+                                                            "system_type=0x%02x sector_count=%u load_rba=%lu\n",
+                                                            mediatype, load_segment, system_type, sector_count, load_rba);
+
+					    /* already chose one, ignore */
+					    if (el_torito_rba != ~0UL)
+						    continue;
+
+                                            if ((mediatype == 0 && el_torito_mode == "noemu")) {
+                                                    el_torito_rba = load_rba;
+                                                    el_torito_mediatype = mediatype;
+                                                    el_torito_load_segment = (load_segment != 0) ? load_segment : 0x7C0;
+                                                    el_torito_sectors = sector_count; /* VIRTUAL EMULATED sectors not CD-ROM SECTORS */
+                                            }
+                                    }
+                                    else {
+                                            LOG_MSG("El Torito entry: ignoring bootable non-x86 (platform_id=0x%02x) record\n", header_platform);
+                                    }
+                            }
+                            else {
+                                    LOG_MSG("El Torito entry: ignoring unknown record ID %02x\n", entry[0]);
+                            }
+                    }
+            }
+
+            if (el_torito_rba == (~0ul) || el_torito_sectors == 0) {
+                    WriteOut("Unable to locate bootable section\n");
+                    return;
+            }
+
+            LOG_MSG("Using: rba=%lu virt-sectors=%lu load=0x%lx mediatype=%u",
+                    (unsigned long)el_torito_rba,
+                    (unsigned long)el_torito_sectors,
+                    (unsigned long)el_torito_load_segment,
+                    el_torito_mediatype);
+
+	    load_seg = el_torito_load_segment;
+
+            /* round up to CD-ROM sectors and read */
+            unsigned int bootcdsect = (el_torito_sectors + 3u) / 4u; /* 4 512-byte sectors per CD-ROM sector */
+            if (bootcdsect == 0) bootcdsect = 1;
+
+            for (unsigned int s=0;s < bootcdsect;s++) {
+                if (!src_drive->ReadSectorsHost(entries, false, el_torito_rba+s, 1)) {
+                    WriteOut("El Torito boot sector unreadable\n");
+                    return;
+                }
+
+                for(i=0;i<2048;i++) real_writeb((uint16_t)load_seg, (uint16_t)i+(s*2048), entries[i]);
+            }
+
+            /* signal INT 13h to emulate a CD-ROM drive El Torito "no emulation" style */
+            INT13_ElTorito_IDEInterface = -1;
+            INT13_ElTorito_NoEmuDriveNumber = 0x90;
+            INT13_ElTorito_NoEmuCDROMDrive = el_torito_cd_drive;
+
+            /* this is required if INT 13h extensions are to correctly report what IDE controller the drive is connected to and master/slave */
+            {
+                int x = IDE_MatchCDROMDrive(el_torito_cd_drive);
+                if (x >= 0) INT13_ElTorito_IDEInterface = (char)x;
+                LOG_MSG("CD-ROM drive IDE interface number %d",INT13_ElTorito_IDEInterface);
+            }
+
+            SegSet16(cs, load_seg);
+            SegSet16(ds, 0);
+            SegSet16(es, 0);
+            reg_ip = 0;
+            reg_ebx = 0;
+            reg_esp = 0x100;
+            /* set up stack at a safe place */
+            SegSet16(ss, (uint16_t)stack_seg);
+            reg_esi = 0;
+            reg_ecx = 0;
+            reg_ebp = 0;
+            reg_eax = 0;
+            /* ISOLINUX clearly assumes DL at entry contains the drive number and at no point from entry to INT 13h does it change the contents of DX */
+            reg_edx = INT13_ElTorito_NoEmuDriveNumber;
+#ifdef __WIN32__
+            // let menu know it boots
+            menu.boot=true;
+#endif
+            bootguest=false;
+            bootdrive=drive-65;
+
+            /* forcibly exit the shell, the DOS kernel, and anything else by throwing an exception */
+            throw int(2);
+
+            return;
+        }
 
         if(!cmd->GetCount()) {
             uint8_t drv = dos_kernel_disabled?26:DOS_GetDefaultDrive();
@@ -2342,7 +2612,10 @@ public:
         }
 
         /* NTS: Load address is 128KB - sector size */
-        load_seg=IS_PC98_ARCH ? (0x2000 - (bootsize/16U)) : 0x07C0;
+        if (loadseg_user > 0) /* Some PC-98 games have floppy boot code that suggests the boot segment isn't always 0x1FC0 like PC-9821 hardware does? */
+            load_seg=(unsigned int)loadseg_user;
+        else
+            load_seg=IS_PC98_ARCH ? (0x2000 - (bootsize/16U)) : 0x07C0;
 
         if (!has_read) {
             if (imageDiskList[drive - 65]->Read_Sector(0, 0, 1, (uint8_t *)&bootarea) != 0) {
@@ -2646,12 +2919,7 @@ public:
                 }
             }
 
-            if (IS_PC98_ARCH) {
-                for(i=0;i<bootsize;i++) real_writeb((uint16_t)load_seg, (uint16_t)i, bootarea.rawdata[i]);
-            }
-            else {
-                for(i=0;i<bootsize;i++) real_writeb(0, (uint16_t)((load_seg<<4) + i), bootarea.rawdata[i]);
-            }
+            for(i=0;i<bootsize;i++) real_writeb((uint16_t)load_seg, (uint16_t)i, bootarea.rawdata[i]);
 
             /* debug */
             LOG_MSG("Booting guest OS stack_seg=0x%04x load_seg=0x%04x\n",(int)stack_seg,(int)load_seg);
@@ -2870,7 +3138,7 @@ void runBoot(const char *str) {
 
 class LOADROM : public Program {
 public:
-    void Run(void) {
+    void Run(void) override {
 		if (cmd->FindExist("-?", false) || cmd->FindExist("/?", false)) {
 			WriteOut(MSG_Get("PROGRAM_LOADROM_HELP"));
 			return;
@@ -2883,7 +3151,7 @@ public:
 
         uint8_t drive;
         char fullname[DOS_PATHLENGTH];
-        localDrive* ldp=0;
+        localDrive* ldp=nullptr;
         if (!DOS_MakeName(temp_line.c_str(),fullname,&drive)) return;
 
         try {
@@ -2964,7 +3232,7 @@ public:
 
         uint8_t drive;
         char fullname[DOS_PATHLENGTH];
-        localDrive* ldp = 0;
+        localDrive* ldp = nullptr;
         if (!DOS_MakeName(temp_line.c_str(), fullname, &drive)) return;
 
         try {
@@ -3245,7 +3513,7 @@ restart_int:
     }
 #endif
 
-    void Run(void) {
+    void Run(void) override {
         std::string disktype;
         std::string src;
         std::string filename;
@@ -3817,7 +4085,7 @@ restart_int:
             }
             while ((vol_sectors/sectors_per_cluster) >= (fatlimit - 2u) && sectors_per_cluster < 0x80u) sectors_per_cluster <<= 1;
             sbuf[0x0d]=(uint8_t)sectors_per_cluster;
-            // TODO small floppys have 2 sectors per cluster?
+            // TODO small floppies have 2 sectors per cluster?
             // reserved sectors
             host_writew(&sbuf[0x0e],reserved_sectors);
             // Number of FATs
@@ -4185,7 +4453,7 @@ void IMGSWAP_ProgramStart(Program** make)
 
 class LOADFIX : public Program {
 public:
-    void Run(void);
+    void Run(void) override;
 };
 
 bool XMS_Active(void);
@@ -4361,7 +4629,7 @@ static void LOADFIX_ProgramStart(Program * * make) {
 
 class RESCAN : public Program {
 public:
-    void Run(void);
+    void Run(void) override;
 };
 
 void RESCAN::Run(void)
@@ -4552,7 +4820,7 @@ public:
         return true;
     }
 
-    void Run(void) {
+    void Run(void) override {
 		if (cmd->FindExist("-?", false) || cmd->FindExist("/?", false)) {
 			WriteOut("A full-screen introduction to DOSBox-X.\n\nINTRO [/RUN] [CDROM|MOUNT|USAGE|WELCOME]\n");
 			return;
@@ -4692,47 +4960,8 @@ quit:
     }
 };
 
-bool ElTorito_ChecksumRecord(unsigned char *entry/*32 bytes*/) {
-    unsigned int chk=0,i;
-
-    for (i=0;i < 16;i++) {
-        unsigned int word = ((unsigned int)entry[0]) + ((unsigned int)entry[1] << 8);
-        chk += word;
-        entry += 2;
-    }
-    chk &= 0xFFFF;
-    return (chk == 0);
-}
-
 static void INTRO_ProgramStart(Program * * make) {
     *make=new INTRO;
-}
-
-bool ElTorito_ScanForBootRecord(CDROM_Interface *drv,unsigned long &boot_record,unsigned long &el_torito_base) {
-    unsigned char buffer[2048];
-    unsigned int sec;
-
-    for (sec=16;sec < 32;sec++) {
-        if (!drv->ReadSectorsHost(buffer,false,sec,1))
-            break;
-
-        /* stop at terminating volume record */
-        if (buffer[0] == 0xFF) break;
-
-        /* match boot record and whether it conforms to El Torito */
-        if (buffer[0] == 0x00 && memcmp(buffer+1,"CD001",5) == 0 && buffer[6] == 0x01 &&
-            memcmp(buffer+7,"EL TORITO SPECIFICATION\0\0\0\0\0\0\0\0\0",32) == 0) {
-            boot_record = sec;
-            el_torito_base = (unsigned long)buffer[71] +
-                    ((unsigned long)buffer[72] << 8UL) +
-                    ((unsigned long)buffer[73] << 16UL) +
-                    ((unsigned long)buffer[74] << 24UL);
-
-            return true;
-        }
-    }
-
-    return false;
 }
 
 imageDiskMemory* CreateRamDrive(Bitu sizes[], const int reserved_cylinders, const bool forceFloppy, Program* obj) {
@@ -4953,7 +5182,7 @@ class IMGMOUNT : public Program {
 			if (none) WriteOut(MSG_Get("PROGRAM_IMGMOUNT_STATUS_NONE"));
 			dos.dta(save_dta);
 		}
-		void Run(void) {
+		void Run(void) override {
 			//Hack To allow long commandlines
 			ChangeToLongCmd();
 			/* In secure mode don't allow people to change imgmount points. 
@@ -5660,7 +5889,8 @@ class IMGMOUNT : public Program {
 			}
 
 			/* FIXME: We only support the floppy emulation mode at this time.
-			 *        "Superfloppy" or hard disk emulation modes are not yet implemented */
+			 *        "Superfloppy" or hard disk emulation modes are not yet implemented.
+			 *        This mode will never support "no emulation" boot. */
 			if (type != "floppy") {
 				WriteOut("El Torito emulation must be used with -t floppy at this time\n");
 				return false;
@@ -5884,8 +6114,6 @@ class IMGMOUNT : public Program {
 			std::vector<DOS_Drive*> imgDisks;
 			std::vector<std::string>::size_type i;
 			std::vector<DOS_Drive*>::size_type ct;
-			FILE *diskfiles[MAX_SWAPPABLE_DISKS];
-			for (i = 0; i < MAX_SWAPPABLE_DISKS; i++) diskfiles[i]=NULL;
 
 			for (i = 0; i < paths.size(); i++) {
 				const char* errorMessage = NULL;
@@ -6040,7 +6268,6 @@ class IMGMOUNT : public Program {
 							errorMessage = ver_msg;
 						}
 					} else {
-						diskfiles[i]=fdrive->loadedDisk->diskimg;
 						if ((vhdImage&&ro)||roflag) fdrive->readonly=true;
 					}
 					unformatted = fdrive->unformatted;
@@ -6333,7 +6560,7 @@ class IMGMOUNT : public Program {
 			uint8_t starthead = 0; // start head of partition
 			uint8_t startsect = 0; // start sector of partition
 			uint16_t startcyl = 0; // start cylinder of partition
-			uint8_t ptype = 0;     // Partition Type
+			//uint8_t ptype = 0;     // Partition Type
 			uint16_t endcyl = 0;   // end cylinder of partition
 			uint8_t heads = 0;     // heads in partition
 			uint8_t sectors = 0;   // sectors per track in partition
@@ -6344,7 +6571,7 @@ class IMGMOUNT : public Program {
 				startsect = (buf[0x1f0] & 0x3fu) - 1u;
 				startcyl = (unsigned char)buf[0x1f1] | (unsigned int)((buf[0x1f0] & 0xc0) << 2u);
 				endcyl = (unsigned char)buf[0x1f5] | (unsigned int)((buf[0x1f4] & 0xc0) << 2u);
-				ptype = buf[0x1f2];
+				//ptype = buf[0x1f2];
 				heads = buf[0x1f3] + 1u;
 				sectors = buf[0x1f4] & 0x3fu;
 			} else if (pe1_size != 0) {                     // DOS 3.3+ partition table, starting at 0x1BE
@@ -6352,7 +6579,7 @@ class IMGMOUNT : public Program {
 				startsect = (buf[0x1c0] & 0x3fu) - 1u;
 				startcyl = (unsigned char)buf[0x1c1] | (unsigned int)((buf[0x1c0] & 0xc0) << 2u);
 				endcyl = (unsigned char)buf[0x1c5] | (unsigned int)((buf[0x1c4] & 0xc0) << 2u);
-				ptype = buf[0x1c2];
+				//ptype = buf[0x1c2];
 				heads = buf[0x1c3] + 1u;
 				sectors = buf[0x1c4] & 0x3fu;
 			}
@@ -6460,7 +6687,7 @@ class IMGMOUNT : public Program {
 
 		imageDisk* MountImageNone(const char* fileName, FILE* file, const Bitu sizesOriginal[], const int reserved_cylinders, bool roflag) {
 			bool assumeHardDisk = false;
-			imageDisk* newImage = 0;
+			imageDisk* newImage = nullptr;
 			Bitu sizes[4];
 			sizes[0] = sizesOriginal[0];
 			sizes[1] = sizesOriginal[1];
@@ -6527,7 +6754,7 @@ class IMGMOUNT : public Program {
 				uint32_t cluster_size = 1u << qcow2_header.cluster_bits;
 				if ((sizes[0] < 512) || ((cluster_size % sizes[0]) != 0)) {
 					WriteOut("Sector size must be larger than 512 bytes and evenly divide the image cluster size of %lu bytes.\n", cluster_size);
-					return 0;
+					return nullptr;
 				}
 				sectors = (uint64_t)qcow2_header.size / (uint64_t)sizes[0];
 				imagesize = (uint32_t)(qcow2_header.size / 1024L);
@@ -6604,7 +6831,9 @@ class IMGMOUNT : public Program {
 			/* auto-fill: head/cylinder count */
 			if (sizes[3]/*cylinders*/ == 0 && sizes[2]/*heads*/ == 0) {
 				sizes[2] = 16; /* typical hard drive, unless a very old drive */
-				sizes[3]/*cylinders*/ = (Bitu)((uint64_t)sectors / (uint64_t)sizes[2]/*heads*/ / (uint64_t)sizes[1]/*sectors/track*/);
+				sizes[3]/*cylinders*/ =
+					(Bitu)(((uint64_t)sectors + ((uint64_t)sizes[2]/*heads*/ * (uint64_t)sizes[1]/*sectors/track*/) - (uint64_t)1u) /
+					((uint64_t)sizes[2]/*heads*/ * (uint64_t)sizes[1]/*sectors/track*/));
 
 				if (IS_PC98_ARCH) {
 					/* TODO: PC-98 has its own issues with a 4096-cylinder limit */
@@ -6619,7 +6848,9 @@ class IMGMOUNT : public Program {
 						if (sizes[2] >= 256) sizes[2] = 255;
 
 						/* and recompute cylinders */
-						sizes[3]/*cylinders*/ = (Bitu)((uint64_t)sectors / (uint64_t)sizes[2]/*heads*/ / (uint64_t)sizes[1]/*sectors/track*/);
+						sizes[3]/*cylinders*/ =
+							(Bitu)(((uint64_t)sectors + ((uint64_t)sizes[2]/*heads*/ * (uint64_t)sizes[1]/*sectors/track*/) - (uint64_t)1u) /
+							((uint64_t)sizes[2]/*heads*/ * (uint64_t)sizes[1]/*sectors/track*/));
 					}
 				}
 			}
@@ -6652,7 +6883,7 @@ const char* DOS_GetLoadedLayout(void);
 
 class KEYB : public Program {
 public:
-    void Run(void);
+    void Run(void) override;
 };
 
 void KEYB::Run(void) {
@@ -6776,7 +7007,7 @@ static void KEYB_ProgramStart(Program * * make) {
 
 class MODE : public Program {
 public:
-    void Run(void);
+    void Run(void) override;
 private:
 	void PrintStatus() {
         WriteOut("Status for device CON:\n----------------------\nColumns=%d\nLines=%d\n", COLS, LINES);
@@ -7085,7 +7316,7 @@ void MAPPER_AutoType(std::vector<std::string> &sequence, const uint32_t wait_ms,
 
 class AUTOTYPE : public Program {
 public:
-	void Run();
+	void Run() override;
 
 private:
 	void PrintUsage();
@@ -7275,7 +7506,7 @@ void AUTOTYPE_ProgramStart(Program **make)
 
 class ADDKEY : public Program {
 public:
-    void Run(void);
+    void Run(void) override;
 private:
 	void PrintUsage() {
         constexpr const char *msg =
@@ -7308,7 +7539,7 @@ static void ADDKEY_ProgramStart(Program * * make) {
 
 class LS : public Program {
 public:
-    void Run(void);
+    void Run(void) override;
 };
 
 void LS::Run()
@@ -7327,7 +7558,7 @@ static void LS_ProgramStart(Program * * make) {
 
 class CHOICE : public Program {
 public:
-    void Run(void);
+    void Run(void) override;
 };
 
 void CHOICE::Run()
@@ -7348,7 +7579,7 @@ void CHOICE_ProgramStart(Program **make)
 
 class COUNTRY : public Program {
 public:
-    void Run(void);
+    void Run(void) override;
 };
 
 void COUNTRY::Run()
@@ -7366,7 +7597,7 @@ static void COUNTRY_ProgramStart(Program * * make) {
 #ifdef C_ICONV
 class UTF8 : public Program {
 public:
-    void Run(void);
+    void Run(void) override;
 private:
 	void PrintUsage() {
         constexpr const char *msg =
@@ -7446,7 +7677,7 @@ static void UTF8_ProgramStart(Program * * make) {
 
 class UTF16 : public Program {
 public:
-    void Run(void);
+    void Run(void) override;
 private:
 	void PrintUsage() {
         constexpr const char *msg =
@@ -7553,7 +7784,7 @@ static void UTF16_ProgramStart(Program * * make) {
 
 class VTEXT : public Program {
 public:
-    void Run(void);
+    void Run(void) override;
 private:
 	void PrintUsage() {
         constexpr const char *msg =
@@ -7582,7 +7813,7 @@ static void VTEXT_ProgramStart(Program * * make) {
 
 class DCGA : public Program {
 public:
-    void Run(void);
+    void Run(void) override;
 };
 
 void DCGA::Run()
@@ -7599,7 +7830,7 @@ static void DCGA_ProgramStart(Program * * make) {
 
 class TEXT80X25 : public Program {
 public:
-    void Run(void);
+    void Run(void) override;
 };
 
 void TEXT80X25::Run()
@@ -7619,7 +7850,7 @@ static void TEXT80X25_ProgramStart(Program * * make) {
 
 class TEXT80X43 : public Program {
 public:
-    void Run(void);
+    void Run(void) override;
 };
 
 void TEXT80X43::Run()
@@ -7639,7 +7870,7 @@ static void TEXT80X43_ProgramStart(Program * * make) {
 
 class TEXT80X50 : public Program {
 public:
-    void Run(void);
+    void Run(void) override;
 };
 
 void TEXT80X50::Run()
@@ -7659,7 +7890,7 @@ static void TEXT80X50_ProgramStart(Program * * make) {
 
 class TEXT80X60 : public Program {
 public:
-    void Run(void);
+    void Run(void) override;
 };
 
 void TEXT80X60::Run()
@@ -7679,7 +7910,7 @@ static void TEXT80X60_ProgramStart(Program * * make) {
 
 class TEXT132X25 : public Program {
 public:
-    void Run(void);
+    void Run(void) override;
 };
 
 void TEXT132X25::Run()
@@ -7699,7 +7930,7 @@ static void TEXT132X25_ProgramStart(Program * * make) {
 
 class TEXT132X43 : public Program {
 public:
-    void Run(void);
+    void Run(void) override;
 };
 
 void TEXT132X43::Run()
@@ -7719,7 +7950,7 @@ static void TEXT132X43_ProgramStart(Program * * make) {
 
 class TEXT132X50 : public Program {
 public:
-    void Run(void);
+    void Run(void) override;
 };
 
 void TEXT132X50::Run()
@@ -7739,7 +7970,7 @@ static void TEXT132X50_ProgramStart(Program * * make) {
 
 class TEXT132X60 : public Program {
 public:
-    void Run(void);
+    void Run(void) override;
 };
 
 void TEXT132X60::Run()
@@ -7759,7 +7990,7 @@ static void TEXT132X60_ProgramStart(Program * * make) {
 
 class HELP : public Program {
 public:
-    void Run(void);
+    void Run(void) override;
 };
 
 void HELP::Run()
@@ -7778,7 +8009,7 @@ static void HELP_ProgramStart(Program * * make) {
 
 class DELTREE : public Program {
 public:
-    void Run(void);
+    void Run(void) override;
 private:
 	void PrintUsage() {
         constexpr const char *msg =
@@ -7816,7 +8047,7 @@ static void DELTREE_ProgramStart(Program * * make) {
 
 class TREE : public Program {
 public:
-    void Run(void);
+    void Run(void) override;
 private:
 	void PrintUsage() {
         constexpr const char *msg =
@@ -7850,7 +8081,7 @@ static void TREE_ProgramStart(Program * * make) {
 
 class TITLE : public Program {
 public:
-    void Run(void);
+    void Run(void) override;
 private:
 	void PrintUsage() {
         constexpr const char *msg =
@@ -7890,7 +8121,7 @@ static void TITLE_ProgramStart(Program * * make) {
 
 class VHDMAKE : public Program {
 public:
-    void Run(void);
+    void Run(void) override;
 private:
     const char* vhdTypes[5] = { "", "", "Fixed", "Dynamic", "Differencing" };
     uint64_t ssizetou64(const char* s_size);
@@ -8120,7 +8351,7 @@ static void VHDMAKE_ProgramStart(Program * * make) {
 
 class COLOR : public Program {
 public:
-    void Run(void);
+    void Run(void) override;
 private:
 	void PrintUsage() {
         constexpr const char *msg =
@@ -8259,7 +8490,7 @@ void resetFontSize();
 bool get_pal = false;
 class SETCOLOR : public Program {
 public:
-    void Run(void);
+    void Run(void) override;
 private:
 	void PrintUsage() {
         constexpr const char *msg =
@@ -8399,7 +8630,7 @@ static void SETCOLOR_ProgramStart(Program * * make) {
 extern Bitu int2fdbg_hook_callback;
 class INT2FDBG : public Program {
 public:
-    void Run(void);
+    void Run(void) override;
 private:
 	void PrintUsage() {
         constexpr const char *msg =
@@ -8460,7 +8691,7 @@ void EndStartProcess() {
 const char * TranslateHostPath(const char * arg, bool next = false);
 class START : public Program {
 public:
-    void Run() {
+    void Run() override {
         if(control->SecureMode()) {
             WriteOut(MSG_Get("PROGRAM_CONFIG_SECURE_DISALLOW"));
             return;
@@ -8779,7 +9010,7 @@ class FLAGSAVE : public Program
 {
 public:
 
-    void Run(void)
+    void Run(void) override
     {
         std::string file_to_flag;
         int i, lf;
@@ -8890,13 +9121,13 @@ static void FLAGSAVE_ProgramStart(Program** make)
 }
 
 void Add_VFiles(bool usecp) {
-    VFILE_Register("TEXTUTIL", 0, 0, "/");
-    VFILE_Register("SYSTEM", 0, 0, "/");
-    VFILE_Register("DEBUG", 0, 0, "/");
-    VFILE_Register("DOS", 0, 0, "/");
-    VFILE_Register("CPI", 0, 0, "/");
-    VFILE_Register("BIN", 0, 0, "/");
-    VFILE_Register("4DOS", 0, 0, "/");
+    VFILE_Register("TEXTUTIL", nullptr, 0, "/");
+    VFILE_Register("SYSTEM", nullptr, 0, "/");
+    VFILE_Register("DEBUG", nullptr, 0, "/");
+    VFILE_Register("DOS", nullptr, 0, "/");
+    VFILE_Register("CPI", nullptr, 0, "/");
+    VFILE_Register("BIN", nullptr, 0, "/");
+    VFILE_Register("4DOS", nullptr, 0, "/");
 
     std::string dirname="drivez";
     std::string path = ".";
@@ -9079,7 +9310,7 @@ void Add_VFiles(bool usecp) {
     if(!IS_PC98_ARCH)
         VFILE_RegisterBuiltinFileBlob(bfb_EVAL_HLP, "/BIN/");
 
-    VFILE_RegisterBuiltinFileBlob(bfb_EGA18_CPX, "/CPI/");
+    VFILE_RegisterBuiltinFileBlob(bfb_EGA18_CPI, "/CPI/");
 	VFILE_RegisterBuiltinFileBlob(bfb_EGA17_CPX, "/CPI/");
 	VFILE_RegisterBuiltinFileBlob(bfb_EGA16_CPX, "/CPI/");
 	VFILE_RegisterBuiltinFileBlob(bfb_EGA15_CPX, "/CPI/");

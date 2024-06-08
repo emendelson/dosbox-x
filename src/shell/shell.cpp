@@ -85,7 +85,7 @@ bool isDBCSCP(), InitCodePage(), isKanji1(uint8_t chr), shiftjis_lead_byte(int c
 Bitu call_shellstop = 0;
 /* Larger scope so shell_del autoexec can use it to
  * remove things from the environment */
-DOS_Shell * first_shell = 0; 
+DOS_Shell * first_shell = nullptr;
 
 static Bitu shellstop_handler(void) {
 	return CBRET_STOP;
@@ -275,7 +275,7 @@ DOS_Shell::DOS_Shell():Program(){
 	echo=true;
 	exit=false;
 	perm = false;
-	bf=0;
+	bf = nullptr;
 	call=false;
 	exec=false;
 	lfnfor = uselfn;
@@ -382,7 +382,7 @@ public:
     std::string str = "";
     unsigned long long curpos = 0;
 	device_TMP(char *name) { SetName(name); };
-	virtual bool Read(uint8_t * data,uint16_t * size) {
+	bool Read(uint8_t * data,uint16_t * size) override {
         int i;
         for (i=0; i<*size; i++) {
             if (curpos+i>=str.size()) break;
@@ -391,11 +391,11 @@ public:
 		*size = i;
 		return true;
 	}
-	virtual bool Write(const uint8_t * data,uint16_t * size) {
+	bool Write(const uint8_t * data,uint16_t * size) override {
         for (int i=0; i<*size; i++) str += std::string(1, data[i]);
 		return true;
 	}
-	virtual bool Seek(uint32_t * pos,uint32_t type) {
+	bool Seek(uint32_t * pos,uint32_t type) override {
 		switch (type) {
             case 0:
                 curpos = *pos;
@@ -411,13 +411,12 @@ public:
                 return false;
 		}
 		if (curpos > str.size()) curpos = str.size();
-		else if (curpos < 0) curpos = 0;
 		return true;
 	}
-	virtual bool Close() { return true; }
-	virtual uint16_t GetInformation(void) { return (strcmp(RunningProgram, "WCLIP") ? DeviceInfoFlags::Device : 0) | DeviceInfoFlags::EofOnInput; }
-	virtual bool ReadFromControlChannel(PhysPt bufptr,uint16_t size,uint16_t * retcode) { (void)bufptr; (void)size; (void)retcode; return false; }
-	virtual bool WriteToControlChannel(PhysPt bufptr,uint16_t size,uint16_t * retcode) { (void)bufptr; (void)size; (void)retcode; return false; }
+	bool Close() override { return true; }
+	uint16_t GetInformation(void) override { return (strcmp(RunningProgram, "WCLIP") ? DeviceInfoFlags::Device : 0) | DeviceInfoFlags::EofOnInput; }
+	bool ReadFromControlChannel(PhysPt bufptr,uint16_t size,uint16_t * retcode) override { (void)bufptr; (void)size; (void)retcode; return false; }
+	bool WriteToControlChannel(PhysPt bufptr,uint16_t size,uint16_t * retcode) override { (void)bufptr; (void)size; (void)retcode; return false; }
 };
 
 void DOS_Shell::ParseLine(char * line) {
@@ -427,10 +426,10 @@ void DOS_Shell::ParseLine(char * line) {
 	line = trim(line);
 
 	/* Do redirection and pipe checks */
-	
-	char * in  = 0;
-	char * out = 0;
-	char * toc = 0;
+
+	char * in  = nullptr;
+	char * out = nullptr;
+	char * toc = nullptr;
 
 	uint16_t dummy,dummy2;
 	uint32_t bigdummy = 0;
@@ -451,7 +450,7 @@ void DOS_Shell::ParseLine(char * line) {
 			DOS_OpenFile(in,OPEN_READ,&dummy);	//Open new stdin
 		} else {
 			WriteOut(!*in?"File open error\n":(dos.errorcode==DOSERR_ACCESS_DENIED?MSG_Get("SHELL_CMD_FILE_ACCESS_DENIED"):"File open error - %s\n"), in);
-			in = 0;
+			in = nullptr;
 			return;
 		}
 	}
@@ -892,7 +891,8 @@ void DOS_Shell::Prepare(void) {
                     } else if (control->opt_langcp && !name && (layout.empty() || layout=="auto"))
                         SetKEYBCP();
                 }
-                if (lastmsgcp && lastmsgcp != dos.loaded_codepage) SwitchLanguage(lastmsgcp, dos.loaded_codepage, true);
+                //if (lastmsgcp && lastmsgcp != dos.loaded_codepage) SwitchLanguage(lastmsgcp, dos.loaded_codepage, true);
+                if (msgcodepage && msgcodepage != dos.loaded_codepage) SwitchLanguage(dos.loaded_codepage, msgcodepage, true);
             }
 			if (country>0&&!control->opt_noconfig) {
 				countryNo = country;
@@ -1093,38 +1093,38 @@ public:
         int cp=dos.loaded_codepage;
         InitCodePage();
         force_conversion = false;
-        int ind=0;
 
         /* The user may have given .BAT files to run on the command line */
         if (!control->auto_bat_additional.empty()) {
             std::string cmd = "@echo off\n";
 
-            for (unsigned int i=0;i<control->auto_bat_additional.size();i++) {
+            decltype(control->auto_bat_additional)::size_type ind = 0;
+            for (auto & str : control->auto_bat_additional) {
                 if (!control->opt_prerun) cmd += "\n";
-                if (!strncmp(control->auto_bat_additional[i].c_str(), "@mount c: ", 10)) {
-                    cmd += control->auto_bat_additional[i]+"\n";
+                if (!strncmp(str.c_str(), "@mount c: ", 10)) {
+                    cmd += str+"\n";
                     cmd += "@config -get lastmount>nul\n";
                     cmd += "@if not '%CONFIG%'=='' %CONFIG%";
                 } else {
                     std::string batname;
-                    //LOG_MSG("auto_bat_additional %s\n", control->auto_bat_additional[i].c_str());
+                    //LOG_MSG("auto_bat_additional %s\n", str.c_str());
 
-                    std::replace(control->auto_bat_additional[i].begin(),control->auto_bat_additional[i].end(),'/','\\');
+                    std::replace(str.begin(),str.end(),'/','\\');
                     size_t pos = std::string::npos;
                     bool lead = false;
-                    for (unsigned int j=0; j<control->auto_bat_additional[i].size(); j++) {
+                    for (unsigned int j=0; j<str.size(); j++) {
                         if (lead) lead = false;
-                        else if ((IS_PC98_ARCH && shiftjis_lead_byte(control->auto_bat_additional[i][j])) || (isDBCSCP() && isKanji1(control->auto_bat_additional[i][j]))) lead = true;
-                        else if (control->auto_bat_additional[i][j]=='\\') pos = j;
+                        else if ((IS_PC98_ARCH && shiftjis_lead_byte(str[j])) || (isDBCSCP() && isKanji1(str[j]))) lead = true;
+                        else if (str[j]=='\\') pos = j;
                     }
                     if(pos == std::string::npos) {  //Only a filename, mount current directory
-                        batname = control->auto_bat_additional[i];
+                        batname = str;
                         cmd += "@mount c: . -nl -q\n";
                     } else { //Parse the path of .BAT file
-                        std::string batpath = control->auto_bat_additional[i].substr(0,pos+1);
+                        std::string batpath = str.substr(0,pos+1);
                         if (batpath==".\\") batpath=".";
                         else if (batpath=="..\\") batpath="..";
-                        batname = control->auto_bat_additional[i].substr(pos+1);
+                        batname = str.substr(pos+1);
                         cmd += "@mount c: \"" + batpath + "\" -nl -q\n";
                     }
                     std::string opt = control->opt_o.size() > ind && control->opt_o[ind].size() ? " "+control->opt_o[ind] : "";
@@ -1297,7 +1297,7 @@ static void AUTOEXEC_ShutDown(Section * sec) {
 	}
     if (first_shell != NULL) {
 		delete first_shell;
-		first_shell = 0;//Make clear that it shouldn't be used anymore
+		first_shell = nullptr;//Make clear that it shouldn't be used anymore
     }
     if (call_shellstop != 0) {
         CALLBACK_DeAllocate(call_shellstop);
@@ -1970,7 +1970,7 @@ void SHELL_Run() {
 	try {
 		first_shell->Run();
 		delete first_shell;
-		first_shell = 0;//Make clear that it shouldn't be used anymore
+		first_shell = nullptr;//Make clear that it shouldn't be used anymore
 		prepared = false;
 		dos_shell_running_program = false;
 #if DOSBOXMENU_TYPE == DOSBOXMENU_HMENU
@@ -1979,7 +1979,7 @@ void SHELL_Run() {
 	}
 	catch (...) {
 		delete first_shell;
-		first_shell = 0;//Make clear that it shouldn't be used anymore
+		first_shell = nullptr;//Make clear that it shouldn't be used anymore
 		prepared = false;
 		dos_shell_running_program = false;
 #if DOSBOXMENU_TYPE == DOSBOXMENU_HMENU

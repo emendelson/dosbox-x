@@ -295,6 +295,18 @@ static inline constexpr bytecount_t _tebibytes(const bytecount_t x) {
     return x << bytecount_t(40u);
 }
 
+enum {
+	PREVCAP_NONE=0,
+	PREVCAP_BLANK,
+	PREVCAP_INVISIBLE
+};
+
+extern unsigned int preventcap;
+
+bool CheckPreventCap(void);
+void ApplyPreventCap(void);
+void ApplyPreventCapMenu(void);
+
 #endif /* DOSBOX_DOSBOX_H */
 
 #ifndef SAVE_STATE_H_INCLUDED
@@ -331,6 +343,7 @@ public:
     //initialization: register relevant components on program startup
     struct Component
     {
+        virtual ~Component() noexcept = default;
         virtual void getBytes(std::ostream& stream) = 0;
         virtual void setBytes(std::istream& stream) = 0;
     };
@@ -395,12 +408,12 @@ public:
     }
 
 protected:
-    virtual void getBytes(std::ostream& stream)
+    void getBytes(std::ostream& stream) override
     {
         std::for_each(podRef.begin(), podRef.end(), std::bind1st(WriteGlobalPOD(), &stream));
     }
 
-    virtual void setBytes(std::istream& stream)
+    void setBytes(std::istream& stream) override
     {
         std::for_each(podRef.begin(), podRef.end(), std::bind1st(ReadGlobalPOD(), &stream));
     }

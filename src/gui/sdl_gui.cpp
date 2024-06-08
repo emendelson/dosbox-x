@@ -79,7 +79,7 @@ static DOSBoxMenu guiMenu, nullMenu;
 class VirtualBatch : public BatchFile {
 public:
                             VirtualBatch(DOS_Shell *host, const std::string& cmds);
-    bool                    ReadLine(char *line);
+    bool                    ReadLine(char *line) override;
 protected:
     std::istringstream      lines;
 };
@@ -234,7 +234,7 @@ extern const char* RunningProgram;
 static GUI::ScreenSDL *UI_Startup(GUI::ScreenSDL *screen) {
     in_gui = true;
 
-    GFX_EndUpdate(0);
+    GFX_EndUpdate(nullptr);
     GFX_SetTitle(-1,-1,-1,true);
     if(!screen) { //Coming from DOSBox. Clean up the keyboard buffer.
         KEYBOARD_ClrBuffer();//Clear buffer
@@ -308,7 +308,7 @@ static GUI::ScreenSDL *UI_Startup(GUI::ScreenSDL *screen) {
 
     if (sw_draw > 0 && sh_draw > 0) {
         screenshot = SDL_CreateRGBSurface(SDL_SWSURFACE, dw, dh, 32, GUI::Color::RedMask, GUI::Color::GreenMask, GUI::Color::BlueMask, 0);
-        SDL_FillRect(screenshot,0,0);
+        SDL_FillRect(screenshot, nullptr, 0);
 
         unsigned int rs = screenshot->format->Rshift, gs = screenshot->format->Gshift, bs = screenshot->format->Bshift;
 
@@ -327,7 +327,7 @@ static GUI::ScreenSDL *UI_Startup(GUI::ScreenSDL *screen) {
         }
 
         background = SDL_CreateRGBSurface(SDL_SWSURFACE, dw, dh, 32, GUI::Color::RedMask, GUI::Color::GreenMask, GUI::Color::BlueMask, 0);
-        SDL_FillRect(background,0,0);
+        SDL_FillRect(background, nullptr, 0);
         for (int y = 0; y < sh_draw; y++) {
             uint32_t *bg = (uint32_t*)((unsigned int)(y+sy)*(unsigned int)background->pitch + (char*)background->pixels) + sx;
             for (int x = 0; x < sw_draw; x++) {
@@ -692,7 +692,7 @@ public:
 
     virtual bool prepare(std::string &buffer) = 0;
 
-    void actionExecuted(GUI::ActionEventSource *b, const GUI::String &arg) {
+    void actionExecuted(GUI::ActionEventSource *b, const GUI::String &arg) override {
         (void)b;//UNUSED
         // HACK: Attempting to cast a String to void causes "forming reference to void" errors when building with GCC 4.7
         (void)arg.size();//UNUSED
@@ -731,14 +731,14 @@ public:
         input->setChecked(static_cast<bool>(prop->GetValue()));
     }
 
-    bool prepare(std::string &buffer) {
+    bool prepare(std::string &buffer) override {
         if (input->isChecked() == static_cast<bool>(prop->GetValue())) return false;
         buffer.append(input->isChecked()?"true":"false");
         return true;
     }
 
     /// Paint label
-	virtual void paint(GUI::Drawable &d) const {
+	void paint(GUI::Drawable &d) const override {
         paintVisGuideLineBetween(d,label,input,this);
     }
 };
@@ -746,7 +746,7 @@ public:
 class ShowOptions : public GUI::MessageBox2 {
 protected:
     GUI::Input *name, *inp;
-    GUI::Checkbox *opt[200];
+    GUI::Radiobox *opt[200];
     std::vector<Value> pv;
     std::vector<GUI::Char> cfg_sname;
     GUI::WindowInWindow * wiw = NULL;
@@ -763,7 +763,7 @@ public:
             wiw = new GUI::WindowInWindow(this, 5, 80, 290, scroll_h);
             bool found = false;
             for(k = 0; k < pv.size(); k++) if (pv[k].ToString().size()) {
-                opt[k] = new GUI::Checkbox(wiw, 5, j*20+5, pv[k].ToString().c_str());
+                opt[k] = new GUI::Radiobox(wiw, 5, j*20+5, pv[k].ToString().c_str());
                 if (GUI::String(pv[k].ToString())==inp->getText()) {
                     found = true;
                     opt[k]->setChecked(true);
@@ -789,9 +789,27 @@ public:
             close->move(155,scroll_h+90);
             resize(310, scroll_h+156);
             move(parent->getWidth()>this->getWidth()?(parent->getWidth()-this->getWidth())/2:0,parent->getHeight()>this->getHeight()?(parent->getHeight()-this->getHeight())/2:0);
+
+            /* first child is first tabbable */
+            if (pv.size() > 0) {
+                Window *w = opt[0];
+                if (w) w->first_tabbable = true;
+            }
+
+            /* last child is first tabbable */
+            if (pv.size() > 0) {
+                Window *w = opt[pv.size()-1];
+                if (w) w->last_tabbable = true;
+            }
+
+            /* the FIRST field needs to come first when tabbed to */
+            if (pv.size() > 0) {
+                Window *w = opt[0];
+                if (w) w->raise();
+            }
     }
 
-    void actionExecuted(GUI::ActionEventSource *b, const GUI::String &arg) {
+    void actionExecuted(GUI::ActionEventSource *b, const GUI::String &arg) override {
         unsigned int j, k;
         for(k = 0; k < pv.size(); k++) if (pv[k].ToString().size()) {
             if (arg == pv[k].ToString() && opt[k]->isChecked())
@@ -861,14 +879,14 @@ public:
         }
     }
 
-    void actionExecuted(GUI::ActionEventSource *b, const GUI::String &arg) {
+    void actionExecuted(GUI::ActionEventSource *b, const GUI::String &arg) override {
         if (arg == "...")
             new ShowOptions(getScreen(), 300, 300, MSG_Get("SELECT_VALUE"), ("Property: \033[31m" + prop->propname + "\033[0m\n\n"+(prop->Get_Default_Value().ToString().size()?"Default value: \033[32m"+prop->Get_Default_Value().ToString()+"\033[0m\n\n":"")+"Possible values to select:\n").c_str(), prop, input);
         else
             PropertyEditor::actionExecuted(b, arg);
     }
 
-    bool prepare(std::string &buffer) {
+    bool prepare(std::string &buffer) override {
         std::string temps = prop->GetValue().ToString();
         if (input->getText() == GUI::String(temps)) return false;
         buffer.append(static_cast<const std::string&>(input->getText()));
@@ -876,7 +894,7 @@ public:
     }
 
     /// Paint label
-	virtual void paint(GUI::Drawable &d) const {
+	void paint(GUI::Drawable &d) const override {
         paintVisGuideLineBetween(d,label,input,this);
     }
 };
@@ -917,14 +935,14 @@ public:
         }
     }
 
-    void actionExecuted(GUI::ActionEventSource *b, const GUI::String &arg) {
+    void actionExecuted(GUI::ActionEventSource *b, const GUI::String &arg) override {
         if (arg == "...")
             new ShowOptions(getScreen(), 300, 300, ("Values for " + prop->propname).c_str(), ("Property: \033[31m" + prop->propname + "\033[0m\n\n"+(prop->Get_Default_Value().ToString().size()?"Default value: \033[32m"+prop->Get_Default_Value().ToString()+"\033[0m\n\n":"")+"Possible values to select:\n").c_str(), prop, input);
         else
             PropertyEditor::actionExecuted(b, arg);
     }
 
-    bool prepare(std::string &buffer) {
+    bool prepare(std::string &buffer) override {
         double val;
         convert(input->getText(), val, false);
         if (val == (double)prop->GetValue()) return false;
@@ -933,7 +951,7 @@ public:
     }
 
     /// Paint label
-	virtual void paint(GUI::Drawable &d) const {
+	void paint(GUI::Drawable &d) const override {
         paintVisGuideLineBetween(d,label,input,this);
     }
 };
@@ -975,14 +993,14 @@ public:
         }
     }
 
-    void actionExecuted(GUI::ActionEventSource *b, const GUI::String &arg) {
+    void actionExecuted(GUI::ActionEventSource *b, const GUI::String &arg) override {
         if (arg == "...")
             new ShowOptions(getScreen(), 300, 300, ("Values for " + prop->propname).c_str(), ("Property: \033[31m" + prop->propname + "\033[0m\n\n"+(prop->Get_Default_Value().ToString().size()?"Default value: \033[32m"+prop->Get_Default_Value().ToString()+"\033[0m\n\n":"")+"Possible values to select:\n").c_str(), prop, input);
         else
             PropertyEditor::actionExecuted(b, arg);
     }
 
-    bool prepare(std::string &buffer) {
+    bool prepare(std::string &buffer) override {
         int val;
         convert(input->getText(), val, false, std::hex);
         if ((Hex)val ==  prop->GetValue()) return false;
@@ -991,7 +1009,7 @@ public:
     }
 
     /// Paint label
-	virtual void paint(GUI::Drawable &d) const {
+	virtual void paint(GUI::Drawable &d) const override {
         paintVisGuideLineBetween(d,label,input,this);
     }
 };
@@ -1033,14 +1051,14 @@ public:
         }
     };
 
-    void actionExecuted(GUI::ActionEventSource *b, const GUI::String &arg) {
+    void actionExecuted(GUI::ActionEventSource *b, const GUI::String &arg) override {
         if (arg == "...")
             new ShowOptions(getScreen(), 300, 300, ("Values for " + prop->propname).c_str(), ("Property: \033[31m" + prop->propname + "\033[0m\n\n"+(prop->Get_Default_Value().ToString().size()?"Default value: \033[32m"+prop->Get_Default_Value().ToString()+"\033[0m\n\n":"")+"Possible values to select:\n").c_str(), prop, input);
         else
             PropertyEditor::actionExecuted(b, arg);
     }
 
-    bool prepare(std::string &buffer) {
+    bool prepare(std::string &buffer) override {
         int val;
         convert(input->getText(), val, false);
         if (val == static_cast<int>(prop->GetValue())) return false;
@@ -1049,7 +1067,7 @@ public:
     };
 
     /// Paint label
-	virtual void paint(GUI::Drawable &d) const {
+	void paint(GUI::Drawable &d) const override {
         paintVisGuideLineBetween(d,label,input,this);
     }
 };
@@ -1491,7 +1509,7 @@ public:
         }
     }
 
-    void actionExecuted(GUI::ActionEventSource *b, const GUI::String &arg) {
+    void actionExecuted(GUI::ActionEventSource *b, const GUI::String &arg) override {
         strcpy(tmp1, mainMenu.get_item("HelpMenu").get_text().c_str());
         if (arg == MSG_Get("OK") && proplist.size()) { close(); running=false; if(!shortcut) resetcfg=true; }
         else if (arg == MSG_Get("OK") || arg == MSG_Get("CANCEL") || arg == MSG_Get("CLOSE")) { close(); if(shortcut) running=false; }
@@ -1528,12 +1546,12 @@ public:
             ToplevelWindow::actionExecuted(b, arg);
     }
 
-    virtual bool keyDown(const GUI::Key &key) {
+    bool keyDown(const GUI::Key &key) override {
         if (GUI::ToplevelWindow::keyDown(key)) return true;
         return false;
     }
 
-    virtual bool keyUp(const GUI::Key &key) {
+    bool keyUp(const GUI::Key &key) override {
         if (GUI::ToplevelWindow::keyUp(key)) return true;
 
         if (key.special == GUI::Key::Escape) {
@@ -1717,7 +1735,7 @@ public:
         }
     }
 
-    void actionExecuted(GUI::ActionEventSource *b, const GUI::String &arg) {
+    void actionExecuted(GUI::ActionEventSource *b, const GUI::String &arg) override {
         if (arg == MSG_Get("OK")) section->data = *(std::string*)content->getText();
         std::string lines = *(std::string*)content->getText();
         strcpy(tmp1, mainMenu.get_item("HelpMenu").get_text().c_str());
@@ -1771,12 +1789,12 @@ public:
         } else ToplevelWindow::actionExecuted(b, arg);
     }
 
-    virtual bool keyDown(const GUI::Key &key) {
+    bool keyDown(const GUI::Key &key) override {
         if (GUI::ToplevelWindow::keyDown(key)) return true;
         return false;
     }
 
-    virtual bool keyUp(const GUI::Key &key) {
+    bool keyUp(const GUI::Key &key) override {
         if (GUI::ToplevelWindow::keyUp(key)) return true;
 
         if (key.special == GUI::Key::Escape) {
@@ -1829,7 +1847,7 @@ public:
         }
     }
 
-    void actionExecuted(GUI::ActionEventSource *b, const GUI::String &arg) {
+    void actionExecuted(GUI::ActionEventSource *b, const GUI::String &arg) override {
         if (arg == MSG_Get("OK")) section->data = *(std::string*)content->getText();
         if (arg == MSG_Get("OK") || arg == MSG_Get("CANCEL") || arg == MSG_Get("CLOSE")) { close(); if(shortcut) running=false; }
         else if (arg == MSG_Get("PASTE_CLIPBOARD")) {
@@ -1864,12 +1882,12 @@ public:
         } else ToplevelWindow::actionExecuted(b, arg);
     }
 
-    virtual bool keyDown(const GUI::Key &key) {
+    bool keyDown(const GUI::Key &key) override {
         if (GUI::ToplevelWindow::keyDown(key)) return true;
         return false;
     }
 
-    virtual bool keyUp(const GUI::Key &key) {
+    bool keyUp(const GUI::Key &key) override {
         if (GUI::ToplevelWindow::keyUp(key)) return true;
 
         if (key.special == GUI::Key::Escape) {
@@ -1912,7 +1930,7 @@ public:
         name->posToEnd(); /* position the cursor at the end where the user is most likely going to edit */
     }
 
-    void actionExecuted(GUI::ActionEventSource *b, const GUI::String &arg) {
+    void actionExecuted(GUI::ActionEventSource *b, const GUI::String &arg) override {
         (void)b;//UNUSED
         if (arg == MSG_Get("USE_PORTABLECONFIG")) {
             name->setText("dosbox-x.conf");
@@ -1944,7 +1962,7 @@ public:
         if(shortcut) running=false;
     }
 
-    virtual bool keyUp(const GUI::Key &key) {
+    virtual bool keyUp(const GUI::Key &key) override {
         if (GUI::ToplevelWindow::keyUp(key)) return true;
 
         if (key.special == GUI::Key::Enter) {
@@ -1982,14 +2000,14 @@ public:
         name->posToEnd(); /* position the cursor at the end where the user is most likely going to edit */
     }
 
-    void actionExecuted(GUI::ActionEventSource *b, const GUI::String &arg) {
+    void actionExecuted(GUI::ActionEventSource *b, const GUI::String &arg) override {
         (void)b;//UNUSED
         if (arg == MSG_Get("OK")) MSG_Write(name->getText(), lang->getText());
         close();
         if(shortcut) running=false;
     }
 
-    virtual bool keyUp(const GUI::Key &key) {
+    bool keyUp(const GUI::Key &key) override {
         if (GUI::ToplevelWindow::keyUp(key)) return true;
 
         if (key.special == GUI::Key::Enter) {
@@ -2018,7 +2036,7 @@ public:
     std::string                         trigger_enter = MSG_Get("OK");
     std::string                         trigger_esc = MSG_Get("CANCEL");
 public:
-    virtual bool                        keyDown(const GUI::Key &key) {
+    bool keyDown(const GUI::Key &key) override {
         if (key.special == GUI::Key::Special::Enter) {
             if (trigger_who != NULL && !trigger_enter.empty())
                 trigger_who->actionExecuted(this, trigger_enter);
@@ -2061,7 +2079,7 @@ public:
         name->posToEnd(); /* position the cursor at the end where the user is most likely going to edit */
     }
 
-    void actionExecuted(GUI::ActionEventSource *b, const GUI::String &arg) {
+    void actionExecuted(GUI::ActionEventSource *b, const GUI::String &arg) override {
         (void)b;//UNUSED
         if (arg == MSG_Get("OK")) {
             char *str = (char*)name->getText();
@@ -2103,7 +2121,7 @@ public:
         name->posToEnd(); /* position the cursor at the end where the user is most likely going to edit */
     }
 
-    void actionExecuted(GUI::ActionEventSource *b, const GUI::String &arg) {
+    void actionExecuted(GUI::ActionEventSource *b, const GUI::String &arg) override {
         (void)b;//UNUSED
         if (arg == MSG_Get("OK")) {
             Section* sec = control->GetSection("sdl");
@@ -2156,7 +2174,7 @@ public:
         move(parent->getWidth()>this->getWidth()?(parent->getWidth()-this->getWidth())/2:0,parent->getHeight()>this->getHeight()?(parent->getHeight()-this->getHeight())/2:0);
     }
 
-    void actionExecuted(GUI::ActionEventSource *b, const GUI::String &arg) {
+    void actionExecuted(GUI::ActionEventSource *b, const GUI::String &arg) override {
         (void)b;//UNUSED
         if (arg == MSG_Get("OK")) {
             autosave_second = atoi(name[0]->getText());
@@ -2204,7 +2222,7 @@ public:
         name->posToEnd(); /* position the cursor at the end where the user is most likely going to edit */
     }
 
-    void actionExecuted(GUI::ActionEventSource *b, const GUI::String &arg) {
+    void actionExecuted(GUI::ActionEventSource *b, const GUI::String &arg) override {
         (void)b;//UNUSED
         if (arg == MSG_Get("OK")) {
             Section* sec = control->GetSection("cpu");
@@ -2240,7 +2258,7 @@ public:
         name->posToEnd(); /* position the cursor at the end where the user is most likely going to edit */
     }
 
-    void actionExecuted(GUI::ActionEventSource *b, const GUI::String &arg) {
+    void actionExecuted(GUI::ActionEventSource *b, const GUI::String &arg) override {
         (void)b;//UNUSED
         Section_prop * sec = static_cast<Section_prop *>(control->GetSection("vsync"));
         if (arg == MSG_Get("OK")) {
@@ -2279,7 +2297,7 @@ public:
             name->posToEnd(); /* position the cursor at the end where the user is most likely going to edit */
     }
 
-    void actionExecuted(GUI::ActionEventSource *b, const GUI::String &arg) {
+    void actionExecuted(GUI::ActionEventSource *b, const GUI::String &arg) override {
         (void)b;//UNUSED
         if (arg == MSG_Get("OK")) {
             extern unsigned int hdd_defsize;
@@ -2318,7 +2336,7 @@ public:
             name->posToEnd(); /* position the cursor at the end where the user is most likely going to edit */
     }
 
-    void actionExecuted(GUI::ActionEventSource *b, const GUI::String &arg) {
+    void actionExecuted(GUI::ActionEventSource *b, const GUI::String &arg) override {
         (void)b;//UNUSED
         if (arg == MSG_Get("OK")) {
             if (set_ver(name->getText()))
@@ -2348,7 +2366,7 @@ public:
             name->posToEnd(); /* position the cursor at the end where the user is most likely going to edit */
     }
 
-    void actionExecuted(GUI::ActionEventSource *b, const GUI::String &arg) {
+    void actionExecuted(GUI::ActionEventSource *b, const GUI::String &arg) override {
         (void)b;//UNUSED
         if (arg == MSG_Get("OK")) {
             SetVal("render", "aspect_ratio", name->getText());
@@ -2389,7 +2407,7 @@ public:
             title1->posToEnd(); /* position the cursor at the end where the user is most likely going to edit */
     }
 
-    void actionExecuted(GUI::ActionEventSource *b, const GUI::String &arg) {
+    void actionExecuted(GUI::ActionEventSource *b, const GUI::String &arg) override {
         (void)b;//UNUSED
         if (arg == MSG_Get("OK")) {
             dosbox_title = trim(title1->getText());
@@ -2424,7 +2442,7 @@ public:
             name->posToEnd(); /* position the cursor at the end where the user is most likely going to edit */
     }
 
-    void actionExecuted(GUI::ActionEventSource *b, const GUI::String &arg) {
+    void actionExecuted(GUI::ActionEventSource *b, const GUI::String &arg) override {
         (void)b;//UNUSED
         if (arg == MSG_Get("OK")) {
             SetVal("sdl", "transparency", name->getText());
@@ -2454,7 +2472,7 @@ public:
             move(parent->getWidth()>this->getWidth()?(parent->getWidth()-this->getWidth())/2:0,parent->getHeight()>this->getHeight()?(parent->getHeight()-this->getHeight())/2:0);
     }
 
-    void actionExecuted(GUI::ActionEventSource *b, const GUI::String &arg) {
+    void actionExecuted(GUI::ActionEventSource *b, const GUI::String &arg) override {
         (void)b;//UNUSED
         if (arg == MSG_Get("CLOSE"))
             close();
@@ -2481,7 +2499,7 @@ public:
             move(parent->getWidth()>this->getWidth()?(parent->getWidth()-this->getWidth())/2:0,parent->getHeight()>this->getHeight()?(parent->getHeight()-this->getHeight())/2:0);
     }
 
-    void actionExecuted(GUI::ActionEventSource *b, const GUI::String &arg) {
+    void actionExecuted(GUI::ActionEventSource *b, const GUI::String &arg) override {
         (void)b;//UNUSED
         if (arg == MSG_Get("CLOSE"))
             close();
@@ -2515,7 +2533,7 @@ public:
             move(parent->getWidth()>this->getWidth()?(parent->getWidth()-this->getWidth())/2:0,parent->getHeight()>this->getHeight()?(parent->getHeight()-this->getHeight())/2:0);
     }
 
-    void actionExecuted(GUI::ActionEventSource *b, const GUI::String &arg) {
+    void actionExecuted(GUI::ActionEventSource *b, const GUI::String &arg) override {
         (void)b;//UNUSED
         if (arg == MSG_Get("CLOSE"))
             close();
@@ -2617,7 +2635,7 @@ public:
             move(parent->getWidth()>this->getWidth()?(parent->getWidth()-this->getWidth())/2:0,parent->getHeight()>this->getHeight()?(parent->getHeight()-this->getHeight())/2:0);
     }
 
-    void actionExecuted(GUI::ActionEventSource *b, const GUI::String &arg) {
+    void actionExecuted(GUI::ActionEventSource *b, const GUI::String &arg) override {
         (void)b;//UNUSED
         if (arg == MSG_Get(MSG_Get("CLOSE")))
             close();
@@ -2656,7 +2674,7 @@ public:
         move(parent->getWidth()>this->getWidth()?(parent->getWidth()-this->getWidth())/2:0,parent->getHeight()>this->getHeight()?(parent->getHeight()-this->getHeight())/2:0);
     }
 
-    void actionExecuted(GUI::ActionEventSource *b, const GUI::String &arg) {
+    void actionExecuted(GUI::ActionEventSource *b, const GUI::String &arg) override {
         (void)b;//UNUSED
         if (arg == MSG_Get("CLOSE"))
             close();
@@ -2682,7 +2700,7 @@ public:
             move(parent->getWidth()>this->getWidth()?(parent->getWidth()-this->getWidth())/2:0,parent->getHeight()>this->getHeight()?(parent->getHeight()-this->getHeight())/2:0);
     }
 
-    void actionExecuted(GUI::ActionEventSource *b, const GUI::String &arg) {
+    void actionExecuted(GUI::ActionEventSource *b, const GUI::String &arg) override {
         (void)b;//UNUSED
         if (arg == MSG_Get("CLOSE"))
             close();
@@ -2702,7 +2720,7 @@ public:
             move(parent->getWidth()>this->getWidth()?(parent->getWidth()-this->getWidth())/2:0,parent->getHeight()>this->getHeight()?(parent->getHeight()-this->getHeight())/2:0);
     }
 
-    void actionExecuted(GUI::ActionEventSource *b, const GUI::String &arg) {
+    void actionExecuted(GUI::ActionEventSource *b, const GUI::String &arg) override {
         (void)b;//UNUSED
         if (arg == MSG_Get("YES"))
             confres=true;
@@ -2750,7 +2768,7 @@ public:
             move(parent->getWidth()>this->getWidth()?(parent->getWidth()-this->getWidth())/2:0,parent->getHeight()>this->getHeight()?(parent->getHeight()-this->getHeight())/2:0);
     }
 
-    void actionExecuted(GUI::ActionEventSource *b, const GUI::String &arg) {
+    void actionExecuted(GUI::ActionEventSource *b, const GUI::String &arg) override {
         (void)b;//UNUSED
         if (arg == "360KB" && imgfd360->isChecked()) {
             imgfd400->setChecked(false);
@@ -2972,7 +2990,7 @@ public:
             move(parent->getWidth()>this->getWidth()?(parent->getWidth()-this->getWidth())/2:0,parent->getHeight()>this->getHeight()?(parent->getHeight()-this->getHeight())/2:0);
     }
 
-    void actionExecuted(GUI::ActionEventSource *b, const GUI::String &arg) {
+    void actionExecuted(GUI::ActionEventSource *b, const GUI::String &arg) override {
         (void)b;//UNUSED
         if (arg == MSG_Get("CLOSE"))
             close();
@@ -2992,7 +3010,7 @@ public:
         move(parent->getWidth()>this->getWidth()?(parent->getWidth()-this->getWidth())/2:0,parent->getHeight()>this->getHeight()?(parent->getHeight()-this->getHeight())/2:0);
     };
 
-    void actionExecuted(GUI::ActionEventSource *b, const GUI::String &arg) {
+    void actionExecuted(GUI::ActionEventSource *b, const GUI::String &arg) override {
         (void)b;//UNUSED
          if (arg == MSG_Get("CLOSE"))
          if(shortcut) running=false;
@@ -3018,7 +3036,7 @@ public:
         move(parent->getWidth()>this->getWidth()?(parent->getWidth()-this->getWidth())/2:0,parent->getHeight()>this->getHeight()?(parent->getHeight()-this->getHeight())/2:0);
     };
 
-    void actionExecuted(GUI::ActionEventSource *b, const GUI::String &arg) {
+    void actionExecuted(GUI::ActionEventSource *b, const GUI::String &arg) override {
         (void)b;//UNUSED
          if (arg == MSG_Get("CLOSE"))
          if(shortcut) running=false;
@@ -3048,7 +3066,7 @@ public:
             move(parent->getWidth()>this->getWidth()?(parent->getWidth()-this->getWidth())/2:0,parent->getHeight()>this->getHeight()?(parent->getHeight()-this->getHeight())/2:0);
     }
 
-    void actionExecuted(GUI::ActionEventSource *b, const GUI::String &arg) {
+    void actionExecuted(GUI::ActionEventSource *b, const GUI::String &arg) override {
         (void)b;//UNUSED
         if (arg == MSG_Get("CLOSE"))
             close();
@@ -3082,7 +3100,7 @@ public:
             move(parent->getWidth()>this->getWidth()?(parent->getWidth()-this->getWidth())/2:0,parent->getHeight()>this->getHeight()?(parent->getHeight()-this->getHeight())/2:0);
     }
 
-    void actionExecuted(GUI::ActionEventSource *b, const GUI::String &arg) {
+    void actionExecuted(GUI::ActionEventSource *b, const GUI::String &arg) override {
         (void)b;//UNUSED
         if (arg == MSG_Get("CLOSE"))
             close();
@@ -3164,12 +3182,12 @@ public:
 
     ~ConfigurationWindow() { running = false; cfg_windows_active.clear(); }
 
-    virtual bool keyDown(const GUI::Key &key) {
+    bool keyDown(const GUI::Key &key) override {
         if (GUI::ToplevelWindow::keyDown(key)) return true;
         return false;
     }
 
-    virtual bool keyUp(const GUI::Key &key) {
+    bool keyUp(const GUI::Key &key) override {
         if (GUI::ToplevelWindow::keyUp(key)) return true;
 
         if (key.special == GUI::Key::Escape) {
@@ -3180,7 +3198,7 @@ public:
         return false;
     }
 
-    void actionExecuted(GUI::ActionEventSource *b, const GUI::String &arg) {
+    void actionExecuted(GUI::ActionEventSource *b, const GUI::String &arg) override {
         GUI::String sname = RestoreName(arg);
         sname.at(0) = (unsigned int)std::tolower((int)sname.at(0));
         Section *sec;
@@ -3322,7 +3340,7 @@ static void UI_Execute(GUI::ScreenSDL *screen) {
         if (background)
             SDL_BlitSurface(background, NULL, sdlscreen, NULL);
         else
-            SDL_FillRect(sdlscreen,0,0);
+            SDL_FillRect(sdlscreen, nullptr, 0);
 
         screen->update(screen->getTime());
 
@@ -3585,7 +3603,7 @@ static void UI_Select(GUI::ScreenSDL *screen, int select) {
         if (background)
             SDL_BlitSurface(background, NULL, sdlscreen, NULL);
         else
-            SDL_FillRect(sdlscreen,0,0);
+            SDL_FillRect(sdlscreen, nullptr, 0);
 
         screen->update(4);
 #if defined(C_SDL2)
@@ -3648,7 +3666,7 @@ void GUI_Shortcut(int select) {
 #if defined(USE_TTF)
     if (ttf.inUse && !confres) {
         ttf_switch_off();
-        GFX_EndUpdate(0);
+        GFX_EndUpdate(nullptr);
         switchttf = true;
         PIC_AddEvent(RunCfgTool, 100);
     } else
@@ -3663,7 +3681,7 @@ void GUI_Run(bool pressed) {
 #if defined(USE_TTF)
     if (ttf.inUse) {
         ttf_switch_off();
-        GFX_EndUpdate(0);
+        GFX_EndUpdate(nullptr);
         switchttf = true;
         PIC_AddEvent(RunCfgTool, 100);
     } else

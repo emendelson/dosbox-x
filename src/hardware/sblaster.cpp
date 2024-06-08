@@ -1300,10 +1300,12 @@ static unsigned int DSP_RateLimitedFinalSB16Freq_New(unsigned int freq) {
 }
 
 static void DSP_PrepareDMA_Old(DMA_MODES mode,bool autoinit,bool sign,bool hispeed) {
+    /* this must be processed BEFORE forcing auto-init because the non-autoinit case provides the DSP transfer block size (fix for "Jump" by Public NMI) */
+    if (!autoinit) sb.dma.total=1u+(unsigned int)sb.dsp.in.data[0]+(unsigned int)(sb.dsp.in.data[1] << 8u);
+
     if (sb.dma.force_autoinit)
         autoinit = true;
 
-    if (!autoinit) sb.dma.total=1u+(unsigned int)sb.dsp.in.data[0]+(unsigned int)(sb.dsp.in.data[1] << 8u);
     sb.dma.autoinit=autoinit;
     sb.dsp.highspeed=hispeed;
     sb.dma.sign=sign;
@@ -1486,7 +1488,7 @@ static void DSP_E2_DMA_CallBack(DmaChannel * /*chan*/, DMAEvent event) {
     if (event==DMA_UNMASKED) {
         uint8_t val = sb.e2.valadd;
         DmaChannel * chan=GetDMAChannel(sb.hw.dma8);
-        chan->Register_Callback(0);
+        chan->Register_Callback(nullptr);
         chan->Write(1,&val);
     }
 }
@@ -1498,7 +1500,7 @@ static void DSP_SC400_E6_DMA_CallBack(DmaChannel * /*chan*/, DMAEvent event) {
         static const char *string = "\x01\x02\x04\x08\x10\x20\x40\x80"; /* Confirmed response via DMA from actual Reveal SC400 card */
         DmaChannel * chan=GetDMAChannel(sb.hw.dma8);
         LOG(LOG_SB,LOG_DEBUG)("SC400 returning DMA test pattern on DMA channel=%u",sb.hw.dma8);
-        chan->Register_Callback(0);
+        chan->Register_Callback(nullptr);
         chan->Write(8,(uint8_t*)string);
         chan->Clear_Request();
         if (!chan->tcount) LOG(LOG_SB,LOG_DEBUG)("SC400 warning: DMA did not reach terminal count");
@@ -1514,7 +1516,7 @@ static void DSP_ADC_CallBack(DmaChannel * /*chan*/, DMAEvent event) {
         ch->Write(1,&val);
     }
     SB_RaiseIRQ(SB_IRQ_8);
-    ch->Register_Callback(0);
+    ch->Register_Callback(nullptr);
 }
 
 static void DSP_ChangeRate(Bitu freq) {
@@ -3516,10 +3518,10 @@ class ViBRA_PnP : public ISAPnPDevice {
 
             end_write_res();        // END
         }
-        void select_logical_device(Bitu val) {
+        void select_logical_device(Bitu val) override {
             logical_device = val;
         }
-        uint8_t read(Bitu addr) {
+        uint8_t read(Bitu addr) override {
             uint8_t ret = 0xFF;
             if (logical_device == 0) {
                 switch (addr) {
@@ -3555,7 +3557,7 @@ class ViBRA_PnP : public ISAPnPDevice {
 
             return ret;
         }
-        void write(Bitu addr,Bitu val) {
+        void write(Bitu addr,Bitu val) override {
             if (logical_device == 0) {
                 switch (addr) {
                     case 0x30:  /* activate range */

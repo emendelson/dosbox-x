@@ -5,7 +5,7 @@
 #include "../src/builtin/cdplay.h"
 #include "../src/builtin/dosmid.h"
 #include "../src/builtin/mpxplay.h"
-#include "../src/builtin/ne2000.h"
+#include "../src/builtin/ne2000bin.h"
 #include "../src/builtin/glide2x.h"
 #include "../src/builtin/emsmagic.h"
 #include "../src/builtin/shutdown.h"
@@ -93,7 +93,7 @@ extern struct BuiltinFileBlob bfb_EGA14_CPX;
 extern struct BuiltinFileBlob bfb_EGA15_CPX;
 extern struct BuiltinFileBlob bfb_EGA16_CPX;
 extern struct BuiltinFileBlob bfb_EGA17_CPX;
-extern struct BuiltinFileBlob bfb_EGA18_CPX;
+extern struct BuiltinFileBlob bfb_EGA18_CPI;
 extern struct BuiltinFileBlob bfb_KEYBOARD_SYS;
 extern struct BuiltinFileBlob bfb_KEYBRD2_SYS;
 extern struct BuiltinFileBlob bfb_KEYBRD3_SYS;

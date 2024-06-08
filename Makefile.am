@@ -24,6 +24,7 @@ dosbox-x.app: $(MACOS_BINARIES) contrib/macos/dosbox.icns src/tool/mach-o-matic
 	mkdir dosbox-x.app/Contents/Resources/drivez
 	mkdir dosbox-x.app/Contents/Resources/glshaders
 	mkdir dosbox-x.app/Contents/Resources/languages
+	mkdir dosbox-x.app/Contents/Resources/HostRun #emendelson
 	cp -v contrib/macos/dosbox-x.plist dosbox-x.app/Contents/Info.plist
 	cp -v contrib/macos/Credits.rtf dosbox-x.app/Contents/Resources/Credits.rtf
 	cp -v contrib/macos/dosbox-x.pkginfo dosbox-x.app/Contents/PkgInfo
@@ -34,6 +35,7 @@ dosbox-x.app: $(MACOS_BINARIES) contrib/macos/dosbox.icns src/tool/mach-o-matic
 	cp -v contrib/macos/dosbox-x.conf dosbox-x.app/Contents/Resources/dosbox-x.conf   #emendelson
 	cp -v contrib/macos/*.sh dosbox-x.app/Contents/Resources/  #emendelson
 	cp -v contrib/macos/*.bat dosbox-x.app/Contents/Resources/  #emendelson
+	cp -v contrib/macos/HostRun/*.* dosbox-x.app/Contents/Resources/HostRun/  #emendelson
 	cp -v contrib/fonts/FREECG98.BMP dosbox-x.app/Contents/Resources/freecg98.bmp
 	cp -v contrib/fonts/wqy_1?pt.bdf dosbox-x.app/Contents/Resources/
 	cp -v contrib/fonts/Nouveau_IBM.ttf dosbox-x.app/Contents/Resources/Nouveau_IBM.ttf

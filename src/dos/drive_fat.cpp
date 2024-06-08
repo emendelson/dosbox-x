@@ -230,14 +230,14 @@ char* fatDrive::Generate_SFN(const char *path, const char *name) {
 class fatFile : public DOS_File {
         public:
                 fatFile(const char* name, uint32_t startCluster, uint32_t fileLen, fatDrive *useDrive);
-                bool Read(uint8_t * data,uint16_t * size);
-                bool Write(const uint8_t * data,uint16_t * size);
-                bool Seek(uint32_t * pos,uint32_t type);
-                bool Close();
-                uint16_t GetInformation(void);
-                void Flush(void);
-                bool UpdateDateTimeFromHost(void);   
-                uint32_t GetSeekPos(void);
+                bool Read(uint8_t * data,uint16_t * size) override;
+                bool Write(const uint8_t * data,uint16_t * size) override;
+                bool Seek(uint32_t * pos,uint32_t type) override;
+                bool Close() override;
+                uint16_t GetInformation(void) override;
+                void Flush(void) override;
+                bool UpdateDateTimeFromHost(void) override;
+                uint32_t GetSeekPos(void) override;
                 uint32_t firstCluster;
                 uint32_t seekpos = 0;
                 uint32_t filelength;
@@ -1416,7 +1416,7 @@ fatDrive::fatDrive(const char* sysFilename, uint32_t bytesector, uint32_t cylsec
 }
 
 fatDrive::fatDrive(imageDisk *sourceLoadedDisk, std::vector<std::string> &options) {
-	if (sourceLoadedDisk == 0) {
+	if (!sourceLoadedDisk) {
 		created_successfully = false;
 		return;
 	}
@@ -1516,18 +1516,34 @@ void fatDrive::UpdateDPB(unsigned char dos_drive) {
         else
             mem_writew(ptr+0x0D,(uint16_t)CountOfClusters + 1);     // +13 = highest cluster number
 
-        mem_writew(ptr+0x0F,(uint16_t)BPB.v.BPB_FATSz16);           // +15 = sectors per FAT
+        if (dos.version.major >= 4) {
+            mem_writew(ptr+0x0F,(uint16_t)BPB.v.BPB_FATSz16);           // +15 = sectors per FAT
 
-        if (BPB.is_fat32())
-            mem_writew(ptr+0x11,0xFFFF);                            // Windows 98 behavior
-        else
-            mem_writew(ptr+0x11,(uint16_t)(firstRootDirSect-partSectOff));// +17 = sector number of first directory sector
+            if (BPB.is_fat32())
+                mem_writew(ptr+0x11,0xFFFF);                            // Windows 98 behavior
+            else
+                mem_writew(ptr+0x11,(uint16_t)(firstRootDirSect-partSectOff));// +17 = sector number of first directory sector
 
-        mem_writed(ptr+0x13,0xFFFFFFFF);                            // +19 = address of device driver header (NOT IMPLEMENTED) Windows 98 behavior
-        mem_writeb(ptr+0x17,GetMediaByte());                        // +23 = media ID byte
-        mem_writeb(ptr+0x18,0x00);                                  // +24 = disk accessed
-        mem_writew(ptr+0x1F,0xFFFF);                                // +31 = number of free clusters or 0xFFFF if unknown
-        // other fields, not implemented
+            mem_writed(ptr+0x13,0xFFFFFFFF);                            // +19 = address of device driver header (NOT IMPLEMENTED) Windows 98 behavior
+            mem_writeb(ptr+0x17,GetMediaByte());                        // +23 = media ID byte
+            mem_writeb(ptr+0x18,0x00);                                  // +24 = disk accessed
+            mem_writew(ptr+0x1F,0xFFFF);                                // +31 = number of free clusters or 0xFFFF if unknown
+            // other fields, not implemented
+        }
+        else {
+            mem_writeb(ptr+0x0F,(uint8_t)BPB.v.BPB_FATSz16);            // +15 = sectors per FAT
+
+            if (BPB.is_fat32())
+                mem_writew(ptr+0x10,0xFFFF);                            // Windows 98 behavior
+            else
+                mem_writew(ptr+0x10,(uint16_t)(firstRootDirSect-partSectOff));// +16 = sector number of first directory sector
+
+            mem_writed(ptr+0x12,0xFFFFFFFF);                            // +18 = address of device driver header (NOT IMPLEMENTED) Windows 98 behavior
+            mem_writeb(ptr+0x16,GetMediaByte());                        // +22 = media ID byte
+            mem_writeb(ptr+0x17,0x00);                                  // +23 = disk accessed
+            mem_writew(ptr+0x1E,0xFFFF);                                // +30 = number of free clusters or 0xFFFF if unknown
+            // other fields, not implemented
+        }
     }
 }
 
@@ -1541,7 +1557,7 @@ void fatDrive::fatDriveInit(const char *sysFilename, uint32_t bytesector, uint32
         char* ext = strrchr((char*)sysFilename, '.');
         if(ext != NULL && (!strcasecmp(ext, ".hdi") || !strcasecmp(ext, ".nhd"))) is_hdd = true;
     }
-    //LOG_MSG("is_hdd = %s", is_hdd ? "true" : "false");
+    bool is_pc98fd = (IS_PC98_ARCH && !is_hdd);
 
 	physToLogAdj = 0;
 	req_ver_major = req_ver_minor = 0;
@@ -1739,15 +1755,17 @@ void fatDrive::fatDriveInit(const char *sysFilename, uint32_t bytesector, uint32
 			partSectOff = startSector;
 			partSectSize = countSector;
 		} else {
-			/* Get floppy disk parameters based on image size */
-			loadedDisk->Get_Geometry(&headscyl, &cylinders, &cylsector, &bytesector);
+			if (headscyl > 0 && cylinders > 0 && cylsector > 0 && bytesector > 0) // manually set geometry if value specified
+				loadedDisk->Set_Geometry(headscyl, cylinders,cylsector, bytesector);
+            else
+                /* Get floppy disk parameters based on image size */
+    			loadedDisk->Get_Geometry(&headscyl, &cylinders, &cylsector, &bytesector);
 			/* Floppy disks don't have partitions */
 			partSectOff = 0;
 
 			if (loadedDisk->heads == 0 || loadedDisk->sectors == 0 || loadedDisk->cylinders == 0) {
-				created_successfully = false;
-				LOG_MSG("No geometry");
-				return;
+                /* Get_Geometry fails for some floppies with weird geometries, so try obtaining the geometry from BPB in such case */
+                LOG_MSG("drive_fat.cpp: No geometry, check your image. Try obtaining from BPB");
 			}
 		}
 
@@ -1919,6 +1937,27 @@ void fatDrive::fatDriveInit(const char *sysFilename, uint32_t bytesector, uint32
 		bootbuffer.bpb.v.BPB_VolID = var_read((uint32_t*)var);
 
         if(!is_hdd) {
+			if (loadedDisk->heads == 0 || loadedDisk->sectors == 0 || loadedDisk->cylinders == 0 || loadedDisk->sector_size == 0) { // Set geometry from BPB
+                headscyl = bootbuffer.bpb.v.BPB_NumHeads;
+                cylsector = bootbuffer.bpb.v.BPB_SecPerTrk;
+                bytesector = bootbuffer.bpb.v.BPB_BytsPerSec;
+                if(headscyl == 0 || cylsector == 0 || bytesector == 0 || loadedDisk->diskSizeK == 0 || ((bytesector & (bytesector - 1)) != 0)/*not a power of 2*/){
+                    LOG_MSG("drive_fat.cpp: Illegal BPB value");
+                    if(!IS_PC98_ARCH){
+                        created_successfully = false;
+                        return;
+                    }
+                }
+                else {
+                    cylinders = loadedDisk->diskSizeK * 1024 / headscyl / cylsector / bytesector;
+                    loadedDisk->Set_Geometry(headscyl, cylinders, cylsector, bytesector);
+                    LOG_MSG("drive_fat.cpp: Floppy geometry set from BPB information SS/C/H/S = %u/%u/%u/%u",
+                        loadedDisk->sector_size,
+                        loadedDisk->cylinders,
+                        loadedDisk->heads,
+                        loadedDisk->sectors);
+                }
+			}
             /* Identify floppy format */
             if((bootbuffer.BS_jmpBoot[0] == 0x69 || bootbuffer.BS_jmpBoot[0] == 0xe9 ||
                 (bootbuffer.BS_jmpBoot[0] == 0xeb && bootbuffer.BS_jmpBoot[2] == 0x90)) &&
@@ -1946,7 +1985,7 @@ void fatDrive::fatDriveInit(const char *sysFilename, uint32_t bytesector, uint32
                 bootbuffer.magic1 = 0x55;	// to silence warning
                 bootbuffer.magic2 = 0xaa;
             }
-            else if(!IS_PC98_ARCH){
+            else if(!IS_PC98_ARCH && loadedDisk->diskSizeK <= 360){
 				/* Read media descriptor in FAT */
 				uint8_t sectorBuffer[512];
 				loadedDisk->Read_AbsoluteSector(1,&sectorBuffer);
@@ -2065,35 +2104,44 @@ void fatDrive::fatDriveInit(const char *sysFilename, uint32_t bytesector, uint32
 	 *
 	 *      Second, there are some HDI images that are valid yet the FAT filesystem reports a head count of 0
 	 *      for some reason (Touhou Project) */
-	if ((BPB.v.BPB_SecPerClus == 0) ||
+	bool pc98fd_sanity_failed = false;
+    if ((BPB.v.BPB_SecPerClus == 0) ||
 		(BPB.v.BPB_NumFATs == 0) ||
 		(BPB.v.BPB_NumHeads == 0 && !IS_PC98_ARCH) ||
 		//(BPB.v.BPB_NumHeads > headscyl && !IS_PC98_ARCH) ||
 		(BPB.v.BPB_SecPerTrk == 0 && !IS_PC98_ARCH) ||
-		(BPB.v.BPB_SecPerTrk > cylsector && !IS_PC98_ARCH)) {
+		(cylsector != 0 && BPB.v.BPB_SecPerTrk > cylsector && !IS_PC98_ARCH)) {
 		if (isipl1 && !IS_PC98_ARCH && (BPB.v.BPB_NumHeads == 0 || BPB.v.BPB_SecPerTrk == 0 || BPB.v.BPB_SecPerTrk > cylsector)) {
 			const char *msg = "Please restart DOSBox-X in PC-98 mode to mount HDI disk images.\r\n";
 			uint16_t n = (uint16_t)strlen(msg);
 			DOS_WriteFile (STDOUT,(uint8_t *)msg, &n);
 		}
-		LOG_MSG("Sanity checks failed");
-		created_successfully = false;
-		return;
+        LOG_MSG("drive_fat.cpp: Sanity checks failed");
+		if(!is_pc98fd){ // PC-98 replaces corrupted FDD BPB with correct values
+            created_successfully = false;
+            return;
+        }
+        else
+            pc98fd_sanity_failed = true;
 	}
 
 	/* Sanity check: Root directory count is nonzero if FAT16/FAT12, or is zero if FAT32 */
 	if (BPB.is_fat32()) {
 		if (BPB.v.BPB_RootEntCnt != 0) {
-			LOG_MSG("Sanity check fail: Root directory count != 0 and not FAT32");
+			LOG_MSG("drive_fat.cpp: Sanity check fail: Root directory count != 0 and FAT32");
 			created_successfully = false;
 			return;
 		}
 	}
 	else {
 		if (BPB.v.BPB_RootEntCnt == 0) {
-			LOG_MSG("Sanity check fail: Root directory count == 0 and not FAT32");
-			created_successfully = false;
-			return;
+			LOG_MSG("drive_fat.cpp: Sanity check fail: Root directory count == 0 and not FAT32");
+			if(!is_pc98fd){
+                created_successfully = false;
+			    return;
+            }
+            else
+                pc98fd_sanity_failed = true;
 		}
 	}
 
@@ -2112,8 +2160,9 @@ void fatDrive::fatDriveInit(const char *sysFilename, uint32_t bytesector, uint32
 	 * 16        16 & 15       10000 AND 01111     RESULT: 00000 (0)
 	 * 17        17 & 16       10001 AND 10000     RESULT: 10000 (16) */
 	if (BPB.v.BPB_BytsPerSec < 128 || BPB.v.BPB_BytsPerSec > SECTOR_SIZE_MAX ||
-		(BPB.v.BPB_BytsPerSec & (BPB.v.BPB_BytsPerSec - 1)) != 0/*not a power of 2*/) {
-        if(IS_PC98_ARCH && !is_hdd && ((bytesector == 1024)||(bytesector == 512))) {
+		(BPB.v.BPB_BytsPerSec & (BPB.v.BPB_BytsPerSec - 1)) != 0/*not a power of 2*/
+        || pc98fd_sanity_failed) {
+        if(is_pc98fd && ((bytesector == 1024)||(bytesector == 512))) {
             LOG_MSG("Experimental: PC-98 autodetect BPB parameters when it is corrupted");
             BPB.v.BPB_BytsPerSec = bytesector;
             BPB.v.BPB_SecPerClus = 1;

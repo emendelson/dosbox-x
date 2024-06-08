@@ -53,15 +53,15 @@ namespace OPL2 {
 	#include "opl.cpp"
 
 	struct Handler : public Adlib::Handler {
-		virtual void WriteReg( uint32_t reg, uint8_t val ) {
+		void WriteReg( uint32_t reg, uint8_t val ) override {
 			adlib_write(reg,val);
 		}
-		virtual uint32_t WriteAddr( uint32_t port, uint8_t val ) {
+		uint32_t WriteAddr( uint32_t port, uint8_t val ) override {
             (void)port;//UNUSED
 			return val;
 		}
 
-		virtual void Generate( MixerChannel* chan, Bitu samples ) {
+		void Generate( MixerChannel* chan, Bitu samples ) override {
 			int16_t buf[1024];
 			while( samples > 0 ) {
 				Bitu todo = samples > 1024 ? 1024 : samples;
@@ -71,11 +71,11 @@ namespace OPL2 {
 			}
 		}
 
-		virtual void Init( Bitu rate ) {
+		void Init( Bitu rate ) override {
 			adlib_init((uint32_t)rate);
 		}
 
-		virtual void SaveState( std::ostream& stream ) {
+		void SaveState( std::ostream& stream ) override {
 			const char pod_name[32] = "OPL2";
 
 			if( stream.fail() ) return;
@@ -90,7 +90,7 @@ namespace OPL2 {
 			adlib_savestate(stream);
 		}
 
-		virtual void LoadState( std::istream& stream ) {
+		void LoadState( std::istream& stream ) override {
 			char pod_name[32] = {0};
 
 			if( stream.fail() ) return;
@@ -120,14 +120,14 @@ namespace OPL3 {
 	#include "opl.cpp"
 
 	struct Handler : public Adlib::Handler {
-		virtual void WriteReg( uint32_t reg, uint8_t val ) {
+		void WriteReg( uint32_t reg, uint8_t val ) override {
 			adlib_write(reg,val);
 		}
-		virtual uint32_t WriteAddr( uint32_t port, uint8_t val ) {
+		uint32_t WriteAddr( uint32_t port, uint8_t val ) override {
 			adlib_write_index(port, val);
 			return opl_index;
 		}
-		virtual void Generate( MixerChannel* chan, Bitu samples ) {
+		void Generate( MixerChannel* chan, Bitu samples ) override {
 			int16_t buf[1024*2];
 			while( samples > 0 ) {
 				Bitu todo = samples > 1024 ? 1024 : samples;
@@ -137,11 +137,11 @@ namespace OPL3 {
 			}
 		}
 
-		virtual void Init( Bitu rate ) {
+		void Init( Bitu rate ) override {
 			adlib_init((uint32_t)rate);
 		}
 
-		virtual void SaveState( std::ostream& stream ) {
+		void SaveState( std::ostream& stream ) override {
 			const char pod_name[32] = "OPL3";
 
 			if( stream.fail() ) return;
@@ -156,7 +156,7 @@ namespace OPL3 {
 			adlib_savestate(stream);
 		}
 
-		virtual void LoadState( std::istream& stream ) {
+		void LoadState( std::istream& stream ) override {
 			char pod_name[32] = {0};
 
 			if( stream.fail() ) return;
@@ -323,14 +323,14 @@ namespace MAMEOPL2 {
 struct Handler : public Adlib::Handler {
 	void* chip = NULL;
 
-	virtual void WriteReg(uint32_t reg, uint8_t val) {
+	void WriteReg(uint32_t reg, uint8_t val) override {
 		ym3812_write(chip, 0, (int)reg);
 		ym3812_write(chip, 1, (int)val);
 	}
-	virtual uint32_t WriteAddr(uint32_t /*port*/, uint8_t val) {
+	uint32_t WriteAddr(uint32_t /*port*/, uint8_t val) override {
 		return val;
 	}
-	virtual void Generate(MixerChannel* chan, Bitu samples) {
+	void Generate(MixerChannel* chan, Bitu samples) override {
 		int16_t buf[1024 * 2];
 		while (samples > 0) {
 			Bitu todo = samples > 1024 ? 1024 : samples;
@@ -339,10 +339,10 @@ struct Handler : public Adlib::Handler {
 			chan->AddSamples_m16(todo, buf);
 		}
 	}
-	virtual void Init(Bitu rate) {
-		chip = ym3812_init(0, OPL2_INTERNAL_FREQ, (uint32_t)rate);
+	void Init(Bitu rate) override {
+		chip = ym3812_init(nullptr, OPL2_INTERNAL_FREQ, (uint32_t)rate);
 	}
-	virtual void SaveState( std::ostream& stream ) {
+	void SaveState( std::ostream& stream ) override {
     	const char pod_name[32] = "MAMEOPL2";
 
     	if( stream.fail() ) return;
@@ -357,7 +357,7 @@ struct Handler : public Adlib::Handler {
     	FMOPL_SaveState(chip, stream);
     }
 
-    virtual void LoadState( std::istream& stream ) {
+    void LoadState( std::istream& stream ) override {
     	char pod_name[32] = {0};
 
     	if( stream.fail() ) return;
@@ -389,14 +389,14 @@ namespace MAMEOPL3 {
 struct Handler : public Adlib::Handler {
 	void* chip = NULL;
 
-	virtual void WriteReg(uint32_t reg, uint8_t val) {
+	void WriteReg(uint32_t reg, uint8_t val) override {
 		ymf262_write(chip, 0, (int)reg);
 		ymf262_write(chip, 1, (int)val);
 	}
-	virtual uint32_t WriteAddr(uint32_t /*port*/, uint8_t val) {
+	uint32_t WriteAddr(uint32_t /*port*/, uint8_t val) override {
 		return val;
 	}
-	virtual void Generate(MixerChannel* chan, Bitu samples) {
+	void Generate(MixerChannel* chan, Bitu samples) override {
 		//We generate data for 4 channels, but only the first 2 are connected on a pc
 		int16_t buf[4][1024];
 		int16_t result[1024][2];
@@ -414,10 +414,10 @@ struct Handler : public Adlib::Handler {
 			chan->AddSamples_s16(todo, result[0]);
 		}
 	}
-	virtual void Init(Bitu rate) {
-		chip = ymf262_init(0, OPL3_INTERNAL_FREQ, (int)rate);
+	void Init(Bitu rate) override {
+		chip = ymf262_init(nullptr, OPL3_INTERNAL_FREQ, (int)rate);
 	}
-	virtual void SaveState( std::ostream& stream ) {
+	void SaveState( std::ostream& stream ) override {
     	const char pod_name[32] = "MAMEOPL3";
 
     	if( stream.fail() ) return;
@@ -431,7 +431,7 @@ struct Handler : public Adlib::Handler {
 
     	YMF_SaveState(chip, stream);
  	}
-    virtual void LoadState( std::istream& stream ) {
+    void LoadState( std::istream& stream ) override {
     	char pod_name[32] = {0};
 
     	if( stream.fail() ) return;
@@ -464,20 +464,20 @@ namespace OPL2BOARD {
 		Handler(const char* port) {
 			opl2AudioBoard.connect(port);
 		}
-		virtual void WriteReg(uint32_t reg, uint8_t val) {
+		void WriteReg(uint32_t reg, uint8_t val) override {
 			opl2AudioBoard.write(reg, val);
 		}
-		virtual uint32_t WriteAddr(uint32_t port, uint8_t val) {
+		uint32_t WriteAddr(uint32_t port, uint8_t val) override {
 			(void)port;
 			return val;
 		}
 
-		virtual void Generate(MixerChannel* chan, Bitu samples) {
+		void Generate(MixerChannel* chan, Bitu samples) override {
 			(void)samples;
 			int16_t buf[1] = { 0 };
 			chan->AddSamples_m16(1, buf);
 		}
-		virtual void Init(Bitu rate) {
+		void Init(Bitu rate) override {
 			(void)rate;
 			opl2AudioBoard.reset();
 		}
@@ -495,10 +495,10 @@ namespace OPL3DUOBOARD {
 		Handler(const char* port) {
 			opl3DuoBoard.connect(port);
 		}
-		virtual void WriteReg(uint32_t reg, uint8_t val) {
+		void WriteReg(uint32_t reg, uint8_t val) override {
 			opl3DuoBoard.write(reg, val);
 		}
-		virtual uint32_t WriteAddr(uint32_t port, uint8_t val) {
+		uint32_t WriteAddr(uint32_t port, uint8_t val) override {
 			uint32_t reg = val;
 
 			if ((port&3)!=0) {
@@ -507,12 +507,12 @@ namespace OPL3DUOBOARD {
 			return reg;
 		}
 
-		virtual void Generate(MixerChannel* chan, Bitu samples) {
+		void Generate(MixerChannel* chan, Bitu samples) override {
             (void)samples;//UNUSED
 			int16_t buf[1] = { 0 };
 			chan->AddSamples_m16(1, buf);
 		}
-		virtual void Init(Bitu rate) {
+		void Init(Bitu rate) override {
             (void)rate;//UNUSED
 			opl3DuoBoard.reset();
 		}
@@ -525,7 +525,7 @@ namespace OPL3DUOBOARD {
 
 namespace Retrowave_OPL3 {
 	struct Handler : public Adlib::Handler {
-		virtual void WriteReg(uint32_t reg, uint8_t val) {
+		void WriteReg(uint32_t reg, uint8_t val) override {
 //			printf("writereg: 0x%08x 0x%02x\n", reg, val);
 
 			uint16_t port = reg & 0x100;
@@ -551,7 +551,7 @@ namespace Retrowave_OPL3 {
 			}
 		}
 
-		virtual uint32_t WriteAddr(uint32_t port, uint8_t val) {
+		uint32_t WriteAddr(uint32_t port, uint8_t val) override {
 //			printf("writeaddr: 0x%08x 0x%02x\n", port, val);
 
 			switch (port & 3) {
@@ -564,7 +564,7 @@ namespace Retrowave_OPL3 {
 			return 0;
 		}
 
-		virtual void Generate(MixerChannel* chan, Bitu samples) {
+		void Generate(MixerChannel* chan, Bitu samples) override {
             (void)samples;//UNUSED
 #ifdef RETROWAVE_USE_BUFFER
 			retrowave_flush(&retrowave_global_context);
@@ -573,7 +573,7 @@ namespace Retrowave_OPL3 {
 			chan->AddSamples_m16(1, &buf);
 		}
 
-		virtual void Init(Bitu rate) {
+		void Init(Bitu rate) override {
             (void)rate;//UNUSED
 			retrowave_opl3_reset(&retrowave_global_context);
 		}
@@ -775,7 +775,7 @@ class Capture {
 			fseek( handle, 0, SEEK_SET );
 			fwrite( &header, 1, sizeof( header ), handle );
 			fclose( handle );
-			handle = 0;
+			handle = nullptr;
 		}
 	}
 public:
@@ -802,7 +802,7 @@ public:
 
 			//if ( passed > 0 ) LOG_MSG( "Delay %d", passed ) ;
 
-			// If we passed more than 30 seconds since the last command, we'll restart the the capture
+			// If we passed more than 30 seconds since the last command, we'll restart the capture
 			if ( passed > 30000 ) {
 				CloseFile();
 				goto skipWrite;
@@ -850,7 +850,7 @@ skipWrite:
 	}
 	Capture( RegisterCache* _cache ) {
 		cache = _cache;
-		handle = 0;
+		handle = nullptr;
 		bufUsed = 0;
         startTicks = 0;
         lastTicks = 0;
@@ -1252,7 +1252,7 @@ void Module::Init( Mode m ) {
 
 
 
-static Adlib::Module* module = 0;
+static Adlib::Module * module = nullptr;
 
 static void OPL_CallBack(Bitu len) {
 	module->handler->Generate( module->mixerChan, len );
@@ -1339,7 +1339,7 @@ void OPL_SaveRawEvent(bool pressed) {
 	/* Check for previously opened wave file */
 	if ( module->capture ) {
 		delete module->capture;
-		module->capture = 0;
+		module->capture = nullptr;
 		LOG_MSG("Stopped Raw OPL capturing.");
 		if (show_recorded_filename && pathopl.size()) systemmessagebox("Recording completed",("Saved Raw OPL output to the file:\n\n"+pathopl).c_str(),"ok", "info", 1);
 	} else {
@@ -1384,8 +1384,8 @@ Module::Module( Section* configuration ) : Module_base(configuration) {
 	ctrl.index = 0;
 	ctrl.lvol = 0xff;
 	ctrl.rvol = 0xff;
-	handler = 0;
-	capture = 0;
+	handler = nullptr;
+	capture = nullptr;
 	esfm_nativemode = false;
 
 	Section_prop * section=static_cast<Section_prop *>(configuration);
@@ -1572,7 +1572,7 @@ void OPL_Init(Section* sec,OPL_Mode oplmode) {
 void OPL_ShutDown(Section* sec){
     (void)sec;//UNUSED
 	delete module;
-	module = 0;
+	module = nullptr;
 }
 
 // savestate support

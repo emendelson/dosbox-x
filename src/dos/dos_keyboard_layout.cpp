@@ -49,14 +49,17 @@ void DOSBox_SetSysMenu(void);
 bool OpenGL_using(void), isDBCSCP(void);
 void change_output(int output), UpdateSDLDrawTexture();
 void SwitchLanguage(int oldcp, int newcp, bool confirm);
+Bitu DOS_ChangeCodepage(int32_t codepage, const char* codepagefile);
 void MSG_Init(), JFONT_Init(), runRescan(const char *str);
 extern int tryconvertcp, toSetCodePage(DOS_Shell *shell, int newCP, int opt);
 extern bool jfont_init;
+extern int msgcodepage;
+
 static FILE* OpenDosboxFile(const char* name) {
 	uint8_t drive;
 	char fullname[DOS_PATHLENGTH];
 
-	localDrive* ldp=0;
+	localDrive* ldp=nullptr;
 	// try to build dos name
 	if (DOS_MakeName(name,fullname,&drive)) {
 		try {
@@ -165,7 +168,7 @@ void keyboard_layout::read_keyboard_file(int32_t specific_layout) {
 
 static uint32_t read_kcl_file(const char* kcl_file_name, const char* layout_id, bool first_id_only) {
 	FILE* tempfile = OpenDosboxFile(kcl_file_name);
-	if (tempfile==0) return 0;
+	if (!tempfile) return 0;
 
 	static uint8_t rbuf[8192];
 
@@ -851,7 +854,7 @@ void initcodepagefont() {
 				cpi_buf_size = get_builtin_codepage(bfb_EGA17_CPX);
 				break;
 			case 856:	case 3846:	case 3848:
-				cpi_buf_size = get_builtin_codepage(bfb_EGA18_CPX);
+				cpi_buf_size = get_builtin_codepage(bfb_EGA18_CPI);
 				break;
             default:
                     return;
@@ -993,7 +996,8 @@ Bitu keyboard_layout::read_codepage_file(const char* codepage_file_name, int32_t
 	if (tempfile==NULL) {
 		// check if built-in codepage is available
 		// reference: https://gitlab.com/FreeDOS/base/cpidos/-/blob/master/DOC/CPIDOS/CODEPAGE.TXT
-		switch (codepage_id) {
+        upxfound = true;
+        switch (codepage_id) {
 			case 437:	case 850:	case 852:	case 853:	case 857:	case 858:
 				cpi_buf_size = get_builtin_codepage(bfb_EGA_CPX);
 				break;
@@ -1046,14 +1050,16 @@ Bitu keyboard_layout::read_codepage_file(const char* codepage_file_name, int32_t
 				cpi_buf_size = get_builtin_codepage(bfb_EGA17_CPX);
 				break;
 			case 856:	case 3846:	case 3848:
-				cpi_buf_size = get_builtin_codepage(bfb_EGA18_CPX);
-				break;
+                cpi_buf_size = get_builtin_codepage(bfb_EGA18_CPI);
+                upxfound = false; // EGA18.CPI is not compressed
+                break;
 			default: 
 				return KEYB_INVALIDCPFILE;
 		}
-		upxfound=true;
-		found_at_pos=0x29;
-		size_of_cpxdata=cpi_buf_size;
+		if(upxfound){
+		    found_at_pos=0x29;
+		    size_of_cpxdata=cpi_buf_size;
+        }
 	} else {
 		uint32_t dr=(uint32_t)fread(cpi_buf, sizeof(uint8_t), 5, tempfile);
 		// check if file is valid
@@ -1732,9 +1738,12 @@ public:
                     UpdateSDLDrawTexture();
 #endif
             }
-            SwitchLanguage(cpbak, dos.loaded_codepage, false);
         }
-	}
+        if(msgcodepage) {
+            SwitchLanguage(dos.loaded_codepage, msgcodepage, false);
+            DOS_ChangeCodepage(msgcodepage, "auto");
+        }
+    }
 
 	~DOS_KeyboardLayout(){
 		if ((dos.loaded_codepage!=GetDefaultCP()) && (CurMode->type==M_TEXT)) {
