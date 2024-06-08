@@ -2181,6 +2181,25 @@ void DOSBox_SetSysMenu(void) {
         InsertMenuItemW(sysmenu, GetMenuItemCount(sysmenu), TRUE, &mii);
         if (buffer != NULL) {delete[] buffer;buffer = NULL;}
     }
+
+    // emendelson next
+    {
+        AppendMenu(sysmenu, MF_SEPARATOR, -1, "");
+
+        {
+            memset(&mii, 0, sizeof(mii));
+            mii.cbSize = sizeof(mii);
+            mii.fMask = MIIM_ID | MIIM_STRING | MIIM_STATE;
+            mii.fState = MFS_ENABLED;
+            mii.wID = ID_WIN_SYSMENU_PRINTHELP;
+            mii.dwTypeData = L"&Print help";
+            mii.cch = (UINT)(wcslen(mii.dwTypeData) + 1);
+
+            InsertMenuItemW(sysmenu, GetMenuItemCount(sysmenu), TRUE, &mii);
+            if(buffer != NULL) { delete[] buffer; buffer = NULL; }
+        }
+    }
+
 #endif
 }
 #if defined(WIN32) && !defined(HX_DOS)

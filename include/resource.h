@@ -744,6 +744,7 @@
 # define ID_WIN_SYSMENU_TTFINCSIZE 0x0F06
 # define ID_WIN_SYSMENU_TTFDECSIZE 0x0F07
 #endif
+# define ID_WIN_SYSMENU_PRINTHELP 0x0F08  // emendelson
 #endif
 #define IDI_MAPPER 0x1000
 #define IDI_CFG_GUI 0x1001
